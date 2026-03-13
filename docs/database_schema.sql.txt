@@ -1,0 +1,38 @@
+-- 1. Tabla de Configuración de la Rifa
+CREATE TABLE rafle_raffles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    price_per_ticket NUMERIC(10, 2) NOT NULL,
+    total_tickets INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Tabla de Compradores
+CREATE TABLE rafle_customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Tabla de Tickets (Inventario y Control de Concurrencia)
+CREATE TABLE rafle_tickets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    raffle_id UUID NOT NULL REFERENCES rafle_raffles(id) ON DELETE CASCADE,
+    ticket_number TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'paid')),
+    customer_id UUID REFERENCES rafle_customers(id) ON DELETE SET NULL,
+    payment_proof_url TEXT,
+    reserved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    
+    -- Constraint crítico: Evita que dos personas compren el mismo número en la misma rifa
+    CONSTRAINT unique_ticket_per_raffle UNIQUE (raffle_id, ticket_number)
+);
+
+-- Índices adicionales para mejorar la velocidad de lectura
+CREATE INDEX idx_rafle_tickets_raffle_id ON rafle_tickets(raffle_id);
+CREATE INDEX idx_rafle_tickets_status ON rafle_tickets(status);

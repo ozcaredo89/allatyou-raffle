@@ -1,0 +1,241 @@
+'use client';
+
+import { createClient } from '@supabase/supabase-js';
+import { useEffect, useState, useCallback } from 'react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type TicketStatus = 'available' | 'reserved' | 'paid';
+
+interface RafleTicket {
+  ticket_number: string;
+  status: TicketStatus;
+}
+
+interface TicketStatusMap {
+  [ticket_number: string]: TicketStatus;
+}
+
+interface NumberGridProps {
+  raffle_id: string;
+  total_tickets: number; // e.g. 9999 → renders 0000 to 9998
+  onTicketSelect?: (ticketNumber: string) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Supabase client (browser-safe, public anon key)
+// ---------------------------------------------------------------------------
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function padTicketNumber(n: number, digits: number): string {
+  return String(n).padStart(digits, '0');
+}
+
+function getTicketDigits(totalTickets: number): number {
+  return String(totalTickets - 1).length;
+}
+
+function statusToStyle(status: TicketStatus | undefined): string {
+  switch (status) {
+    case 'reserved':
+      return 'bg-amber-500/20 border border-amber-500/50 text-amber-400 cursor-not-allowed shadow-[0_0_10px_rgba(245,158,11,0.2)]';
+    case 'paid':
+      return 'bg-red-500/10 border border-red-500/30 text-red-500/50 cursor-not-allowed';
+    case 'available':
+    default:
+      return 'bg-[#0f151f] border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-white hover:scale-110 hover:z-10 cursor-pointer shadow-[0_0_15px_rgba(52,211,153,0.05)] hover:shadow-[0_0_20px_rgba(52,211,153,0.4)] transition-all duration-200';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function NumberGrid({
+  raffle_id,
+  total_tickets,
+  onTicketSelect,
+}: NumberGridProps) {
+  const [statusMap, setStatusMap] = useState<TicketStatusMap>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const digits = getTicketDigits(total_tickets);
+
+  const fetchTickets = useCallback(async () => {
+    // Paginate to handle large ticket counts (Supabase default limit = 1000)
+    const PAGE_SIZE = 1000;
+    let allTickets: RafleTicket[] = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error: fetchError } = await supabase
+        .from('rafle_tickets')
+        .select('ticket_number, status')
+        .eq('raffle_id', raffle_id)
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (fetchError) {
+        setError('Error loading ticket grid. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        allTickets = allTickets.concat(data as RafleTicket[]);
+        from += PAGE_SIZE;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const map: TicketStatusMap = {};
+    for (const ticket of allTickets) {
+      map[ticket.ticket_number] = ticket.status;
+    }
+
+    setStatusMap(map);
+    setLoading(false);
+    setError(null);
+  }, [raffle_id]);
+
+  // Initial fetch + polling every 30 seconds for live updates
+  useEffect(() => {
+    void fetchTickets();
+
+    const intervalId = setInterval(() => {
+      void fetchTickets();
+    }, 30_000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchTickets]);
+
+  // Real-time subscription via Supabase Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel(`rafle_tickets:raffle_id=eq.${raffle_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rafle_tickets',
+          filter: `raffle_id=eq.${raffle_id}`,
+        },
+        (payload) => {
+          const updated = payload.new as RafleTicket;
+          if (updated?.ticket_number && updated?.status) {
+            setStatusMap((prev) => ({
+              ...prev,
+              [updated.ticket_number]: updated.status,
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [raffle_id]);
+
+  const handleTicketClick = (ticketNumber: string, status: TicketStatus | undefined) => {
+    if (status && status !== 'available') return;
+    onTicketSelect?.(ticketNumber);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative flex items-center justify-center h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-t-2 border-emerald-500 animate-spin" />
+            <div className="absolute inset-2 rounded-full border-b-2 border-teal-400 animate-spin-reverse" />
+            <span className="text-xl">💎</span>
+          </div>
+          <p className="text-sm font-bold tracking-widest text-emerald-500/70 animate-pulse uppercase">Cargando Sorteo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-16">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center shadow-[0_0_30px_rgba(239,68,68,0.1)]">
+          <span className="text-3xl mb-2 block">⚠️</span>
+          <p className="font-bold text-red-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      {/* Legend */}
+      <div className="mb-8 flex flex-wrap items-center justify-center gap-6 text-xs font-bold uppercase tracking-wider">
+        <span className="flex items-center gap-2 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]">
+          <span className="inline-block h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+          Disponible
+        </span>
+        <span className="flex items-center gap-2 text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
+          <span className="inline-block h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse" />
+          Reservado
+        </span>
+        <span className="flex items-center gap-2 text-red-500/50">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500/50" />
+          Pagado
+        </span>
+      </div>
+
+      {/* Grid */}
+      <div
+        className="grid gap-1"
+        style={{
+          gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))',
+        }}
+      >
+        {Array.from({ length: total_tickets }, (_, i) => {
+          const ticketNumber = padTicketNumber(i, digits);
+          const status = statusMap[ticketNumber];
+          const isDisabled = status === 'reserved' || status === 'paid';
+
+          return (
+            <button
+              key={ticketNumber}
+              type="button"
+              disabled={isDisabled}
+              aria-label={`Número ${ticketNumber} — ${status ?? 'available'}`}
+              onClick={() => handleTicketClick(ticketNumber, status)}
+              className={[
+                'relative rounded-lg px-1 py-3 text-xs md:text-sm font-black text-center tracking-wider overflow-hidden group',
+                statusToStyle(status),
+              ].join(' ')}
+            >
+              <span className="relative z-10">{ticketNumber}</span>
+              {status === 'available' && (
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/0 via-white/5 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
