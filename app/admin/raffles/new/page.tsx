@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function AdminNewRafflePage() {
   const [name, setName] = useState('');
@@ -72,7 +73,16 @@ export default function AdminNewRafflePage() {
         {/* Ambient Top Glow in Card */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-blue-500/10 blur-[50px] pointer-events-none" />
 
-        <div className="px-8 py-8 border-b border-white/5 bg-[#141b26] relative">
+        <div className="px-8 pt-6 pb-2 relative z-10">
+          <Link
+            href="/admin/raffles"
+            className="inline-flex items-center gap-2 text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+          >
+            <span aria-hidden="true">&larr;</span> Volver al listado
+          </Link>
+        </div>
+
+        <div className="px-8 pb-8 pt-4 border-b border-white/5 bg-[#141b26] relative">
           <div className="inline-flex items-center gap-2 mb-2">
             <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-blue-500/50"></span>
             <span className="text-xs font-bold tracking-widest text-blue-400 uppercase">Panel de Control</span>
@@ -197,27 +207,36 @@ export default function AdminNewRafflePage() {
             </div>
           </div>
 
-          <div className="mt-4 relative group">
-            <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 opacity-40 group-hover:opacity-100 blur transition duration-300"></div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="relative w-full rounded-xl bg-[#0a0f16] border border-white/10 py-4 text-base font-bold text-blue-300 shadow-xl transition-all hover:bg-[#111823] hover:text-blue-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:border-transparent disabled:before:hidden z-10 flex items-center justify-center gap-3"
+          <div className="mt-4 flex flex-col-reverse sm:flex-row items-center gap-4">
+            <Link
+              href="/admin/raffles"
+              className="w-full sm:w-auto rounded-xl border border-white/10 bg-transparent px-8 py-4 text-center text-sm font-bold text-zinc-300 transition-colors hover:bg-white/5 hover:text-white active:scale-[0.98]"
             >
-              {isLoading ? (
-                <>
-                  <div className="relative flex items-center justify-center h-5 w-5">
-                    <div className="absolute inset-0 rounded-full border-t-2 border-blue-400 animate-spin" />
-                    <div className="absolute inset-1 rounded-full border-b-2 border-indigo-400 animate-spin-reverse" />
-                  </div>
-                  Fabricando Tickets...
-                </>
-              ) : (
-                <>
-                  <span className="text-xl">✨</span> Largar Sorteo
-                </>
-              )}
-            </button>
+              Cancelar
+            </Link>
+
+            <div className="relative group w-full flex-1">
+              <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 opacity-40 group-hover:opacity-100 blur transition duration-300"></div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="relative w-full rounded-xl bg-[#0a0f16] border border-white/10 py-4 text-base font-bold text-blue-300 shadow-xl transition-all hover:bg-[#111823] hover:text-blue-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:border-transparent disabled:before:hidden z-10 flex items-center justify-center gap-3"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="relative flex items-center justify-center h-5 w-5">
+                      <div className="absolute inset-0 rounded-full border-t-2 border-blue-400 animate-spin" />
+                      <div className="absolute inset-1 rounded-full border-b-2 border-indigo-400 animate-spin-reverse" />
+                    </div>
+                    Fabricando Tickets...
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl">✨</span> Largar Sorteo
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>
