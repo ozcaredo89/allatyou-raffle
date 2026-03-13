@@ -13,7 +13,7 @@ export default async function Page() {
   // Obtener la rifa "activa" más reciente
   const { data: activeRaffle, error } = await supabase
     .from('rafle_raffles')
-    .select('id, name, description, price_per_ticket, total_tickets')
+    .select('id, name, description, price_per_ticket, start_ticket, end_ticket')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -37,7 +37,8 @@ export default async function Page() {
       raffleName={activeRaffle.name}
       raffleDesc={activeRaffle.description || ''}
       price={activeRaffle.price_per_ticket}
-      totalTickets={activeRaffle.total_tickets}
+      startTicket={activeRaffle.start_ticket}
+      endTicket={activeRaffle.end_ticket}
     />
   );
 }

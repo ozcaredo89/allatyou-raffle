@@ -6,7 +6,10 @@ export default function AdminNewRafflePage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number | ''>('');
-  const [totalTickets, setTotalTickets] = useState<number>(100);
+  const [startTicket, setStartTicket] = useState<number>(0);
+  const [endTicket, setEndTicket] = useState<number>(99);
+
+  const totalTicketsCalculated = Math.max(0, endTicket - startTicket + 1);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +22,8 @@ export default function AdminNewRafflePage() {
     setSuccess(null);
 
     try {
-      if (!name || !price || totalTickets <= 0) {
-        throw new Error('Todos los campos obligatorios deben estar completos y ser válidos.');
+      if (!name || !price || startTicket > endTicket || totalTicketsCalculated <= 0) {
+        throw new Error('Rango de tickets inválido o campos obligatorios vacíos.');
       }
 
       const res = await fetch('/api/raffles/create', {
@@ -30,7 +33,8 @@ export default function AdminNewRafflePage() {
           name,
           description,
           price_per_ticket: Number(price),
-          total_tickets: Number(totalTickets),
+          start_ticket: Number(startTicket),
+          end_ticket: Number(endTicket),
         }),
       });
 
@@ -46,7 +50,8 @@ export default function AdminNewRafflePage() {
       setName('');
       setDescription('');
       setPrice('');
-      setTotalTickets(100);
+      setStartTicket(0);
+      setEndTicket(99);
 
     } catch (err: any) {
       setError(err.message);
@@ -145,25 +150,50 @@ export default function AdminNewRafflePage() {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="startTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+                  Inicial *
+                  <span className="text-xl">🔢</span>
+                </label>
+                <input
+                  id="startTicket"
+                  type="number"
+                  required
+                  min="0"
+                  value={startTicket}
+                  onChange={(e) => setStartTicket(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="endTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+                  Final *
+                  <span className="text-xl">🏁</span>
+                </label>
+                <input
+                  id="endTicket"
+                  type="number"
+                  required
+                  min="0"
+                  value={endTicket}
+                  onChange={(e) => setEndTicket(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(59,130,246,0.1)]">
             <div>
-              <label htmlFor="totalTickets" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
-                Total de Tickets *
-                <span className="text-xl">🎟️</span>
-              </label>
-              <input
-                id="totalTickets"
-                type="number"
-                required
-                min="1"
-                max="10000"
-                value={totalTickets}
-                onChange={(e) => setTotalTickets(Number(e.target.value))}
-                disabled={isLoading}
-                className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
-              />
-              <p className="text-xs text-zinc-500 mt-2 font-medium">
-                Ej: Con 100 se generan números del "00" al "99".
-              </p>
+              <p className="text-sm font-bold text-blue-400">Total a Generar</p>
+              <p className="text-xs text-blue-400/70">Tickets en este rango</p>
+            </div>
+            <div className="text-2xl font-black text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+              {totalTicketsCalculated}
             </div>
           </div>
 

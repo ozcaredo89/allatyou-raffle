@@ -9,7 +9,8 @@ interface MainClientPageProps {
   raffleName: string;
   raffleDesc: string;
   price: number;
-  totalTickets: number;
+  startTicket: number;
+  endTicket: number;
 }
 
 export default function MainClientPage({
@@ -17,7 +18,8 @@ export default function MainClientPage({
   raffleName,
   raffleDesc,
   price,
-  totalTickets,
+  startTicket,
+  endTicket,
 }: MainClientPageProps) {
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
 
@@ -75,7 +77,8 @@ export default function MainClientPage({
         <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 md:p-8 backdrop-blur-sm shadow-2xl shadow-black/50">
           <NumberGrid
             raffle_id={raffleId}
-            total_tickets={totalTickets}
+            start_ticket={startTicket}
+            end_ticket={endTicket}
             onTicketSelect={handleTicketSelect}
           />
         </div>

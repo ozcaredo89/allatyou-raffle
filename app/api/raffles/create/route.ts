@@ -10,21 +10,24 @@ interface CreateRaffleBody {
   name: string;
   description?: string;
   price_per_ticket: number;
-  total_tickets: number;
+  start_ticket: number;
+  end_ticket: number;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body: CreateRaffleBody = await request.json();
-    const { name, description, price_per_ticket, total_tickets } = body;
+    const { name, description, price_per_ticket, start_ticket, end_ticket } = body;
 
     // 1. Basic Validation
-    if (!name || !price_per_ticket || !total_tickets || total_tickets <= 0) {
+    if (!name || !price_per_ticket || start_ticket === undefined || end_ticket === undefined || start_ticket > end_ticket) {
       return NextResponse.json(
-        { error: 'Missing or invalid required fields: name, price_per_ticket, total_tickets' },
+        { error: 'Missing or invalid required fields: name, price, start_ticket, end_ticket' },
         { status: 400 }
       );
     }
+
+    const total_tickets = end_ticket - start_ticket + 1;
 
     // 2. Insert new Raffle
     const { data: raffle, error: raffleError } = await supabase
@@ -34,6 +37,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         description: description || null,
         price_per_ticket,
         total_tickets,
+        start_ticket,
+        end_ticket,
         status: 'active',
       })
       .select('id')
@@ -50,12 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const raffle_id = raffle.id;
 
     // 3. Generate tickets in memory
-    // Calculate string length for zero padding (e.g. 100 -> 2 digits: "00" to "99")
-    const digits = String(total_tickets - 1).length;
+    // Calculate string length for zero padding based on the highest number (end_ticket)
+    const digits = String(end_ticket).length;
     
     const ticketsToInsert = Array.from({ length: total_tickets }, (_, i) => ({
       raffle_id,
-      ticket_number: String(i).padStart(digits, '0'),
+      ticket_number: String(start_ticket + i).padStart(digits, '0'),
       status: 'available',
     }));
 

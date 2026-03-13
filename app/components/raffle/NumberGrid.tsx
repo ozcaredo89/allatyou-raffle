@@ -20,7 +20,8 @@ interface TicketStatusMap {
 
 interface NumberGridProps {
   raffle_id: string;
-  total_tickets: number; // e.g. 9999 → renders 0000 to 9998
+  start_ticket: number;
+  end_ticket: number;
   onTicketSelect?: (ticketNumber: string) => void;
 }
 
@@ -41,8 +42,8 @@ function padTicketNumber(n: number, digits: number): string {
   return String(n).padStart(digits, '0');
 }
 
-function getTicketDigits(totalTickets: number): number {
-  return String(totalTickets - 1).length;
+function getTicketDigits(endTicket: number): number {
+  return String(endTicket).length;
 }
 
 function statusToStyle(status: TicketStatus | undefined): string {
@@ -63,7 +64,8 @@ function statusToStyle(status: TicketStatus | undefined): string {
 
 export default function NumberGrid({
   raffle_id,
-  total_tickets,
+  start_ticket,
+  end_ticket,
   onTicketSelect,
 }: NumberGridProps) {
   const [statusMap, setStatusMap] = useState<TicketStatusMap>({});
@@ -73,9 +75,10 @@ export default function NumberGrid({
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 100;
+  const total_tickets = end_ticket - start_ticket + 1;
   const totalPages = Math.ceil(total_tickets / itemsPerPage);
 
-  const digits = getTicketDigits(total_tickets);
+  const digits = getTicketDigits(end_ticket);
 
   const fetchTickets = useCallback(async () => {
     // Paginate to handle large ticket counts (Supabase default limit = 1000)
@@ -216,10 +219,10 @@ export default function NumberGrid({
           gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
         }}
       >
-        {Array.from({ length: total_tickets }, (_, i) => i)
+        {Array.from({ length: total_tickets }, (_, i) => start_ticket + i)
           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-          .map((i) => {
-            const ticketNumber = padTicketNumber(i, digits);
+          .map((ticketInt) => {
+            const ticketNumber = padTicketNumber(ticketInt, digits);
             const status = statusMap[ticketNumber];
             const isDisabled = status === 'reserved' || status === 'paid';
 
