@@ -70,6 +70,11 @@ export default function NumberGrid({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+  const totalPages = Math.ceil(total_tickets / itemsPerPage);
+
   const digits = getTicketDigits(total_tickets);
 
   const fetchTickets = useCallback(async () => {
@@ -206,36 +211,63 @@ export default function NumberGrid({
 
       {/* Grid */}
       <div
-        className="grid gap-1"
+        className="grid gap-2"
         style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
         }}
       >
-        {Array.from({ length: total_tickets }, (_, i) => {
-          const ticketNumber = padTicketNumber(i, digits);
-          const status = statusMap[ticketNumber];
-          const isDisabled = status === 'reserved' || status === 'paid';
+        {Array.from({ length: total_tickets }, (_, i) => i)
+          .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+          .map((i) => {
+            const ticketNumber = padTicketNumber(i, digits);
+            const status = statusMap[ticketNumber];
+            const isDisabled = status === 'reserved' || status === 'paid';
 
-          return (
-            <button
-              key={ticketNumber}
-              type="button"
-              disabled={isDisabled}
-              aria-label={`Número ${ticketNumber} — ${status ?? 'available'}`}
-              onClick={() => handleTicketClick(ticketNumber, status)}
-              className={[
-                'relative rounded-lg px-1 py-3 text-xs md:text-sm font-black text-center tracking-wider overflow-hidden group',
-                statusToStyle(status),
-              ].join(' ')}
-            >
-              <span className="relative z-10">{ticketNumber}</span>
-              {status === 'available' && (
-                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/0 via-white/5 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              )}
-            </button>
-          );
+            return (
+              <button
+                key={ticketNumber}
+                type="button"
+                disabled={isDisabled}
+                aria-label={`Número ${ticketNumber} — ${status ?? 'available'}`}
+                onClick={() => handleTicketClick(ticketNumber, status)}
+                className={[
+                  'relative rounded-xl px-2 py-4 text-sm md:text-base font-black text-center tracking-wider overflow-hidden group',
+                  statusToStyle(status),
+                ].join(' ')}
+              >
+                <span className="relative z-10">{ticketNumber}</span>
+                {status === 'available' && (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/0 via-white/5 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                )}
+              </button>
+            );
         })}
       </div>
+
+      {/* Pagination Footer */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-6">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d131c] px-5 py-3 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span>←</span> Anterior
+          </button>
+          
+          <span className="text-sm font-bold text-zinc-500">
+            Página <strong className="text-white">{currentPage}</strong> de {totalPages}
+          </span>
+          
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d131c] px-5 py-3 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Siguiente <span>→</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
