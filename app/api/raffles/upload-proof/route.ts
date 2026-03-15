@@ -1,11 +1,14 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { Resend } from 'resend';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+const resend = new Resend(process.env.ALLATYOU_RESEND_API_KEY!);
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -93,6 +96,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { error: 'Tickets not found for the given raffle_id and ticket_numbers' },
         { status: 404 }
       );
+    }
+
+    // Send admin notification email
+    try {
+      const { data: ticketData } = await supabase
+        .from('rafle_tickets')
+        .select('customer_id')
+        .eq('raffle_id', raffle_id)
+        .eq('ticket_number', ticket_numbers[0])
+        .single();
+        
+      if (ticketData?.customer_id) {
+        const { data: customerData } = await supabase
+          .from('rafle_customers')
+          .select('name')
+          .eq('id', ticketData.customer_id)
+          .single();
+          
+        if (customerData?.name) {
+          const fromEmail = process.env.ALLATYOU_RESEND_FROM || 'onboarding@resend.dev';
+          const adminEmail = process.env.ALLATYOU_ADMIN_EMAIL;
+          
+          if (adminEmail) {
+            await resend.emails.send({
+              from: fromEmail,
+              to: [adminEmail],
+              subject: `Nuevo comprobante de pago - Tickets: ${ticket_numbers.join(', ')}`,
+              text: `${customerData.name} acaba de subir el comprobante para los tickets ${ticket_numbers.join(', ')}. Aquí está el link de la foto para que lo apruebes: ${publicUrl}`
+            });
+          } else {
+            console.error('ALLATYOU_ADMIN_EMAIL is not set in environment variables');
+          }
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending admin email notification:', emailError);
     }
 
     return NextResponse.json(
