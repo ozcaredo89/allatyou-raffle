@@ -81,6 +81,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: true, message: 'Ticket aprobado exitosamente.' });
     }
 
+    // Fallback if action is somehow not caught
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+
   } catch (error: any) {
     console.error('Validation route unexpected error:', error);
     return NextResponse.json(
