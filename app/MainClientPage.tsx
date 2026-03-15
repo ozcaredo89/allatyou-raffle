@@ -9,8 +9,8 @@ interface MainClientPageProps {
   raffleName: string;
   raffleDesc: string;
   price: number;
-  startTicket: number;
-  endTicket: number;
+  startTicket?: number | null;
+  endTicket?: number | null;
 }
 
 export default function MainClientPage({
@@ -21,14 +21,27 @@ export default function MainClientPage({
   startTicket,
   endTicket,
 }: MainClientPageProps) {
-  const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
+  const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const handleTicketSelect = (ticket: string) => {
-    setSelectedTicket(ticket);
+    setSelectedTickets(prev => {
+      if (prev.includes(ticket)) return prev.filter(t => t !== ticket);
+      if (prev.length >= 10) {
+        alert('Solo puedes seleccionar un máximo de 10 tickets a la vez.');
+        return prev;
+      }
+      return [...prev, ticket];
+    });
   };
 
   const closeModal = () => {
-    setSelectedTicket(null);
+    setIsCheckoutOpen(false);
+  };
+
+  const onSuccess = () => {
+    setSelectedTickets([]);
+    setIsCheckoutOpen(false);
   };
 
   const formatPrice = (amount: number) => {
@@ -73,26 +86,45 @@ export default function MainClientPage({
       </header>
 
       {/* Main Grid Area */}
-      <main className="relative mx-auto w-full max-w-4xl px-4 py-8 md:py-12 z-10">
+      <main className="relative mx-auto w-full max-w-4xl px-4 py-8 md:py-12 z-10 mb-20">
         <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 md:p-8 backdrop-blur-sm shadow-2xl shadow-black/50">
           <NumberGrid
             raffle_id={raffleId}
             start_ticket={startTicket}
             end_ticket={endTicket}
+            selectedTickets={selectedTickets}
             onTicketSelect={handleTicketSelect}
           />
         </div>
       </main>
 
+      {/* Floating Checkout Bar */}
+      {selectedTickets.length > 0 && !isCheckoutOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#141b26]/90 backdrop-blur-xl border-t border-emerald-500/20 p-4 md:p-6 shadow-[0_-10px_40px_rgba(52,211,153,0.1)] animate-[fadeInUp_0.3s_ease-out]">
+           <div className="mx-auto max-w-4xl flex justify-between items-center px-2">
+             <div className="flex flex-col">
+               <span className="text-[10px] md:text-sm text-zinc-400 uppercase tracking-widest font-bold">{selectedTickets.length} Seleccionado(s)</span>
+               <span className="text-xl md:text-2xl font-black text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">{formatPrice(selectedTickets.length * price)}</span>
+             </div>
+             <button 
+               onClick={() => setIsCheckoutOpen(true)} 
+               className="px-6 py-3 md:px-8 md:py-4 bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.4)] rounded-xl font-black tracking-wide text-white scale-95 hover:scale-100 active:scale-95"
+             >
+                Comprar Ahora →
+             </button>
+           </div>
+        </div>
+      )}
+
       {/* Checkout Modal */}
       <CheckoutModal
-        isOpen={selectedTicket !== null}
+        isOpen={isCheckoutOpen}
         onClose={closeModal}
-        ticketNumber={selectedTicket || ''}
+        ticketNumbers={selectedTickets}
         raffleId={raffleId}
-        onSuccess={() => {
-          // Success action handled in modal
-        }}
+        raffleName={raffleName}
+        totalPrice={selectedTickets.length * price}
+        onSuccess={onSuccess}
       />
     </div>
   );

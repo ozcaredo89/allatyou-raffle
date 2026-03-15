@@ -10,24 +10,60 @@ interface CreateRaffleBody {
   name: string;
   description?: string;
   price_per_ticket: number;
-  start_ticket: number;
-  end_ticket: number;
+  start_ticket?: number;
+  end_ticket?: number;
+  custom_numbers?: string[];
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body: CreateRaffleBody = await request.json();
-    const { name, description, price_per_ticket, start_ticket, end_ticket } = body;
+    const { name, description, price_per_ticket, start_ticket, end_ticket, custom_numbers } = body;
 
     // 1. Basic Validation
-    if (!name || !price_per_ticket || start_ticket === undefined || end_ticket === undefined || start_ticket > end_ticket) {
+    const isSpecificMode = custom_numbers !== undefined && Array.isArray(custom_numbers);
+    const isRangeMode = start_ticket !== undefined && end_ticket !== undefined;
+
+    if (!name || !price_per_ticket || (!isRangeMode && !isSpecificMode)) {
       return NextResponse.json(
-        { error: 'Missing or invalid required fields: name, price, start_ticket, end_ticket' },
+        { error: 'Missing or invalid required fields: name, price, and either a range or custom_numbers' },
         { status: 400 }
       );
     }
 
-    const total_tickets = end_ticket - start_ticket + 1;
+    let finalTickets: string[] = [];
+    let startToSave: number | null = null;
+    let endToSave: number | null = null;
+
+    if (isSpecificMode) {
+      if (custom_numbers.length === 0) {
+        return NextResponse.json({ error: 'custom_numbers cannot be empty' }, { status: 400 });
+      }
+      const unique = Array.from(new Set(custom_numbers));
+      const firstLen = unique[0].length;
+      if (!unique.every(n => n.length === firstLen)) {
+        return NextResponse.json({ error: 'All specific numbers must have the exact same character length' }, { status: 400 });
+      }
+      finalTickets = unique;
+    } else {
+      if (start_ticket === undefined || end_ticket === undefined) {
+        return NextResponse.json({ error: 'start_ticket and end_ticket are required for range mode' }, { status: 400 });
+      }
+      if (start_ticket > end_ticket) {
+        return NextResponse.json({ error: 'start_ticket must be <= end_ticket' }, { status: 400 });
+      }
+      startToSave = start_ticket;
+      endToSave = end_ticket;
+      
+      const totalInRange = end_ticket - start_ticket + 1;
+      const digits = String(end_ticket).length;
+      
+      finalTickets = Array.from({ length: totalInRange }, (_, i) => 
+        String(start_ticket + i).padStart(digits, '0')
+      );
+    }
+
+    const total_tickets = finalTickets.length;
 
     // 2. Insert new Raffle
     const { data: raffle, error: raffleError } = await supabase
@@ -37,8 +73,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         description: description || null,
         price_per_ticket,
         total_tickets,
-        start_ticket,
-        end_ticket,
+        start_ticket: startToSave,
+        end_ticket: endToSave,
         status: 'active',
       })
       .select('id')
@@ -55,12 +91,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const raffle_id = raffle.id;
 
     // 3. Generate tickets in memory
-    // Calculate string length for zero padding based on the highest number (end_ticket)
-    const digits = String(end_ticket).length;
-    
-    const ticketsToInsert = Array.from({ length: total_tickets }, (_, i) => ({
+    const ticketsToInsert = finalTickets.map(ticket_number => ({
       raffle_id,
-      ticket_number: String(start_ticket + i).padStart(digits, '0'),
+      ticket_number,
       status: 'available',
     }));
 

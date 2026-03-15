@@ -5,18 +5,20 @@ import { useState, useRef } from 'react';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  ticketNumber: string;
+  ticketNumbers: string[];
   raffleId: string;
   raffleName?: string;
+  totalPrice: number;
   onSuccess: () => void;
 }
 
 export default function CheckoutModal({
   isOpen,
   onClose,
-  ticketNumber,
+  ticketNumbers,
   raffleId,
   raffleName = 'Rifa',
+  totalPrice,
   onSuccess,
 }: CheckoutModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -43,7 +45,7 @@ export default function CheckoutModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           raffle_id: raffleId,
-          ticket_number: ticketNumber,
+          ticket_numbers: ticketNumbers,
           customer_name: name,
           customer_phone: phone,
         }),
@@ -83,7 +85,7 @@ export default function CheckoutModal({
     setError(null);
 
     const formData = new FormData();
-    formData.append('ticket_number', ticketNumber);
+    formData.append('ticket_numbers', JSON.stringify(ticketNumbers));
     formData.append('raffle_id', raffleId);
     formData.append('file', file);
 
@@ -132,7 +134,7 @@ export default function CheckoutModal({
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
               <span className="text-emerald-400">#</span>
-              <span className="drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">{ticketNumber}</span>
+              <span className="drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">{ticketNumbers.join(', ')}</span>
             </h2>
             {step !== 3 && (
               <button
@@ -208,7 +210,7 @@ export default function CheckoutModal({
                 
                 {/* Secondary WhatsApp Button */}
                 <a
-                  href={`https://wa.me/573147369247?text=${encodeURIComponent(`Hola, quiero comprar el número ${ticketNumber} de la ${raffleName}.`)}`}
+                  href={`https://wa.me/573147369247?text=${encodeURIComponent(`Hola, quiero comprar los números ${ticketNumbers.join(', ')} de la ${raffleName}.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/5 py-4 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
@@ -234,7 +236,7 @@ export default function CheckoutModal({
 
               <div>
                 <p className="text-sm font-medium text-zinc-400">
-                  Transfiere exactamente el valor a:
+                  Transfiere exactamente <strong className="text-white text-lg">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(totalPrice)}</strong> a:
                 </p>
                 <div className="mx-auto mt-3 inline-block rounded-xl border border-white/10 bg-[#0a0f16] px-8 py-4 shadow-inner">
                   <p className="text-2xl font-black tracking-wider text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
@@ -307,10 +309,10 @@ export default function CheckoutModal({
                 <span className="text-5xl drop-shadow-md">💎</span>
               </div>
               <h3 className="text-2xl font-black text-white mt-2 tracking-tight">
-                ¡Ticket Asegurado!
+                ¡Tickets Asegurados!
               </h3>
               <p className="text-sm text-zinc-400 max-w-[250px]">
-                El ticket <strong className="text-emerald-400">#{ticketNumber}</strong> ha entrado a validación. Te confirmaremos por WhatsApp.
+                Los tickets <strong className="text-emerald-400">#{ticketNumbers.join(', ')}</strong> han entrado a validación. Te confirmaremos por WhatsApp.
               </p>
               <button
                 onClick={handleSuccessClose}

@@ -8,7 +8,7 @@ const supabase = createClient(
 
 interface ReserveRequestBody {
   raffle_id: string;
-  ticket_number: string;
+  ticket_numbers: string[];
   customer_name: string;
   customer_phone: string;
 }
@@ -16,11 +16,11 @@ interface ReserveRequestBody {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body: ReserveRequestBody = await request.json();
-    const { raffle_id, ticket_number, customer_name, customer_phone } = body;
+    const { raffle_id, ticket_numbers, customer_name, customer_phone } = body;
 
-    if (!raffle_id || !ticket_number || !customer_name || !customer_phone) {
+    if (!raffle_id || !ticket_numbers || !Array.isArray(ticket_numbers) || ticket_numbers.length === 0 || !customer_name || !customer_phone) {
       return NextResponse.json(
-        { error: 'Missing required fields: raffle_id, ticket_number, customer_name, customer_phone' },
+        { error: 'Missing required fields or empty ticket numbers array' },
         { status: 400 }
       );
     }
@@ -54,31 +54,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       customer_id = newCustomer.id;
     }
 
-    // Step 2: Optimistic UPDATE — only succeeds if ticket is still 'available'
-    const { data: updatedTickets, error: updateError } = await supabase
-      .from('rafle_tickets')
-      .update({
-        status: 'reserved',
-        customer_id,
-        reserved_at: new Date().toISOString(),
-      })
-      .eq('raffle_id', raffle_id)
-      .eq('ticket_number', ticket_number)
-      .eq('status', 'available')
-      .select('id, ticket_number, status');
+    // Step 2: Use Supabase RPC to reserve multiple tickets atomically
+    const { data: rpcData, error: rpcError } = await supabase.rpc('reserve_tickets', {
+      p_raffle_id: raffle_id,
+      p_customer_id: customer_id,
+      p_ticket_numbers: ticket_numbers,
+    });
 
-    if (updateError) {
-      console.error('Ticket update error:', updateError);
+    if (rpcError) {
+      // Si el error viene de tu RAISE EXCEPTION en PostgreSQL
+      if (rpcError.message.includes('Error de concurrencia')) {
+        return NextResponse.json(
+          { error: 'Uno o más tickets ya no están disponibles. Han sido reservados por otra persona. ¡Sé más rápido la próxima vez!' },
+          { status: 409 } // Conflicto: Alguien lo compró primero
+        );
+      }
+
+      // Si es un error real de la base de datos (se cayó, timeout, etc)
+      console.error('RPC reserve_tickets error:', rpcError);
       return NextResponse.json(
-        { error: 'Database error while reserving ticket' },
+        { error: 'Database transaction error while reserving tickets' },
         { status: 500 }
       );
     }
 
-    // If no rows were updated, ticket is no longer available (conflict)
-    if (!updatedTickets || updatedTickets.length === 0) {
+    if (!rpcData) { // If RPC returns false/0 meaning it failed to secure ALL tickets
       return NextResponse.json(
-        { error: 'Ticket is no longer available. It may have been reserved by someone else.' },
+        { error: 'Uno o más tickets ya no están disponibles. Han sido reservados por otra persona. ¡Sé más rápido la próxima vez!' },
         { status: 409 }
       );
     }
@@ -86,15 +88,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: true,
-        ticket: updatedTickets[0],
+        reserved_count: ticket_numbers.length,
         customer_id,
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Reserve route unexpected error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }

@@ -14,8 +14,8 @@ interface Raffle {
   name: string;
   description: string;
   price_per_ticket: number;
-  start_ticket: number;
-  end_ticket: number;
+  start_ticket: number | null;
+  end_ticket: number | null;
   status: 'active' | 'paused' | 'completed' | 'cancelled';
   created_at: string;
 }
@@ -29,6 +29,10 @@ export default function AdminRafflesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+
+  // Add numbers state
+  const [addingNumbersId, setAddingNumbersId] = useState<string | null>(null);
+  const [newNumbersInput, setNewNumbersInput] = useState('');
 
   const fetchRaffles = async () => {
     setLoading(true);
@@ -87,8 +91,15 @@ export default function AdminRafflesPage() {
 
   const startEditing = (raffle: Raffle) => {
     setEditingId(raffle.id);
+    setAddingNumbersId(null);
     setEditName(raffle.name);
     setEditDesc(raffle.description || '');
+  };
+
+  const startAddingNumbers = (raffle: Raffle) => {
+    setAddingNumbersId(raffle.id);
+    setEditingId(null);
+    setNewNumbersInput('');
   };
 
   const saveEdit = async (id: string) => {
@@ -105,6 +116,31 @@ export default function AdminRafflesPage() {
         r.id === id ? { ...r, name: editName, description: editDesc } : r
       ));
       setEditingId(null);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const saveNewNumbers = async (id: string) => {
+    if (!newNumbersInput.trim()) return;
+
+    const numbersArray = newNumbersInput.split(',').map(n => n.trim()).filter(n => n.length > 0);
+    
+    if (numbersArray.length === 0) return;
+
+    try {
+      const res = await fetch(`/api/raffles/${id}/add-tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_numbers: numbersArray }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al agregar los números.');
+      
+      alert(`¡Éxito! Se añadieron ${data.added} ticket(s) nuevos.`);
+      setAddingNumbersId(null);
+      setNewNumbersInput('');
     } catch (err: any) {
       alert(err.message);
     }
@@ -213,9 +249,11 @@ export default function AdminRafflesPage() {
                         <div>
                           <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Rango</p>
                           <p className="font-mono text-sm font-medium text-blue-300">
-                            {raffle.start_ticket} → {raffle.end_ticket}
+                            {raffle.start_ticket !== null ? `${raffle.start_ticket} → ${raffle.end_ticket}` : 'Específicos'}
                           </p>
-                          <p className="text-[10px] text-zinc-600 mt-0.5">({raffle.end_ticket - raffle.start_ticket + 1} tkts)</p>
+                          {raffle.start_ticket !== null && (
+                            <p className="text-[10px] text-zinc-600 mt-0.5">({raffle.end_ticket! - raffle.start_ticket! + 1} tkts)</p>
+                          )}
                         </div>
                         <div>
                           <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Precio</p>
@@ -225,30 +263,60 @@ export default function AdminRafflesPage() {
                     </>
                   )}
 
+                  {/* Add Numbers Inline */}
+                  {addingNumbersId === raffle.id && (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-xs font-bold text-amber-400">➕ Agregar Números Nuevos</p>
+                      <textarea 
+                        value={newNumbersInput}
+                        onChange={(e) => setNewNumbersInput(e.target.value)}
+                        placeholder="Ej. 100, 105, 120"
+                        className="w-full bg-[#0a0f16] border border-amber-500/30 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none resize-none"
+                        rows={2}
+                      />
+                      <div className="flex gap-2.5 mt-2">
+                        <button onClick={() => saveNewNumbers(raffle.id)} className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold transition-colors hover:bg-amber-500">Añadir</button>
+                        <button onClick={() => setAddingNumbersId(null)} className="flex-1 rounded-lg bg-[#0a0f16] border border-white/10 px-4 py-2 text-xs font-bold text-zinc-400 transition-colors hover:text-white">Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Spacer to push buttons to bottom */}
                   <div className="flex-1" />
 
                   {/* Actions */}
-                  {editingId !== raffle.id && (
-                    <div className="flex border-t border-white/5 pt-4 gap-2">
-                       <button
-                         onClick={() => startEditing(raffle)}
-                         className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                       >
-                         ✏️ Editar
-                       </button>
-                       <button
-                         onClick={() => handleToggleStatus(raffle)}
-                         className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                       >
-                         {raffle.status === 'active' ? '⏸️ Pausar' : '▶️ Reanudar'}
-                       </button>
-                       <button
-                         onClick={() => handleDelete(raffle.id, raffle.name)}
-                         className="flex-1 rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-bold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
-                       >
-                         🗑️ Borrar
-                       </button>
+                  {editingId !== raffle.id && addingNumbersId !== raffle.id && (
+                    <div className="flex flex-col border-t border-white/5 pt-4 gap-2">
+                      <div className="flex gap-2">
+                         <button
+                           onClick={() => startEditing(raffle)}
+                           className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
+                         >
+                           ✏️ Editar
+                         </button>
+                         <button
+                           onClick={() => handleToggleStatus(raffle)}
+                           className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
+                         >
+                           {raffle.status === 'active' ? '⏸️ Pausar' : '▶️ Reanudar'}
+                         </button>
+                         <button
+                           onClick={() => handleDelete(raffle.id, raffle.name)}
+                           className="flex-1 rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-bold text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300"
+                         >
+                           🗑️ Borrar
+                         </button>
+                      </div>
+                      
+                      {/* Specific Mode Add Numbers Button */}
+                      {raffle.start_ticket === null && (
+                        <button
+                          onClick={() => startAddingNumbers(raffle)}
+                          className="w-full rounded-lg border border-amber-500/20 bg-amber-500/10 py-2 text-xs font-bold text-amber-500 transition-colors hover:bg-amber-500/20"
+                        >
+                          ➕ Agregar Más Números
+                        </button>
+                      )}
                     </div>
                   )}
                   

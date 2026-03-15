@@ -20,15 +20,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
 
-    const ticket_number = formData.get('ticket_number') as string | null;
+    const ticket_numbers_str = formData.get('ticket_numbers') as string | null;
     const raffle_id = formData.get('raffle_id') as string | null;
     const file = formData.get('file') as File | null;
 
-    if (!ticket_number || !raffle_id || !file) {
+    if (!ticket_numbers_str || !raffle_id || !file) {
       return NextResponse.json(
-        { error: 'Missing required fields: ticket_number, raffle_id, file' },
+        { error: 'Missing required fields: ticket_numbers, raffle_id, file' },
         { status: 400 }
       );
+    }
+
+    let ticket_numbers: string[] = [];
+    try {
+      ticket_numbers = JSON.parse(ticket_numbers_str);
+      if (!Array.isArray(ticket_numbers) || ticket_numbers.length === 0) throw new Error();
+    } catch {
+      return NextResponse.json({ error: 'invalid ticket_numbers format' }, { status: 400 });
     }
 
     // Validate file type — only images allowed
@@ -39,10 +47,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Build a unique, collision-resistant filename
+    // Build a unique, collision-resistant filename using the first ticket number
     const fileExtension = file.name.split('.').pop() ?? 'jpg';
     const timestamp = Date.now();
-    const fileName = `proofs/${raffle_id}/${ticket_number}_${timestamp}.${fileExtension}`;
+    const fileName = `proofs/${raffle_id}/${ticket_numbers[0]}_${timestamp}.${fileExtension}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -61,29 +69,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Build the public URL using the R2 public domain
     const publicUrl = `${process.env.R2_PUBLIC_URL!.replace(/\/$/, '')}/${fileName}`;
 
-    // Update the ticket: status → 'paid', clear reserved_at, save proof URL
+    // Update the tickets: status → 'pending', save proof URL
     const { data: updatedTickets, error: updateError } = await supabase
       .from('rafle_tickets')
       .update({
-        status: 'paid',
-        reserved_at: null,
+        status: 'pending',
         payment_proof_url: publicUrl,
       })
       .eq('raffle_id', raffle_id)
-      .eq('ticket_number', ticket_number)
+      .in('ticket_number', ticket_numbers)
       .select('id, ticket_number, status, payment_proof_url');
 
     if (updateError) {
       console.error('Ticket payment update error:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update ticket after proof upload' },
+        { error: 'Failed to update tickets after proof upload' },
         { status: 500 }
       );
     }
 
     if (!updatedTickets || updatedTickets.length === 0) {
       return NextResponse.json(
-        { error: 'Ticket not found for the given raffle_id and ticket_number' },
+        { error: 'Tickets not found for the given raffle_id and ticket_numbers' },
         { status: 404 }
       );
     }

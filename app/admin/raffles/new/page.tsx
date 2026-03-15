@@ -9,8 +9,18 @@ export default function AdminNewRafflePage() {
   const [price, setPrice] = useState<number | ''>('');
   const [startTicket, setStartTicket] = useState<number>(0);
   const [endTicket, setEndTicket] = useState<number>(99);
+  const [creationMode, setCreationMode] = useState<'range' | 'specific'>('range');
+  const [customNumbersInput, setCustomNumbersInput] = useState<string>('');
 
-  const totalTicketsCalculated = Math.max(0, endTicket - startTicket + 1);
+  const parseCustomNumbers = (input: string) => {
+    return input.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  };
+
+  const currentCustomNumbers = parseCustomNumbers(customNumbersInput);
+  
+  const totalTicketsCalculated = creationMode === 'range' 
+    ? Math.max(0, endTicket - startTicket + 1)
+    : new Set(currentCustomNumbers).size;
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,20 +33,36 @@ export default function AdminNewRafflePage() {
     setSuccess(null);
 
     try {
-      if (!name || !price || startTicket > endTicket || totalTicketsCalculated <= 0) {
-        throw new Error('Rango de tickets inválido o campos obligatorios vacíos.');
+      if (!name || !price || totalTicketsCalculated <= 0) {
+        throw new Error('Debes proveer un título, precio y al menos un ticket para generar.');
       }
+      if (creationMode === 'range' && startTicket > endTicket) {
+        throw new Error('El rango de tickets es inválido (el inicial debe ser menor o igual al final).');
+      }
+
+      // Validar longitud uniforme en modo específico
+      const uniqueSpecifics = Array.from(new Set(currentCustomNumbers));
+      if (creationMode === 'specific' && uniqueSpecifics.length > 0) {
+        const firstLen = uniqueSpecifics[0].length;
+        if (!uniqueSpecifics.every(n => n.length === firstLen)) {
+          throw new Error('En la modalidad de números específicos, todos los boletos deben tener exactamente la misma longitud de caracteres (ej. todos de 2 o todos de 3 dígitos).');
+        }
+      }
+
+      const payload = {
+        name,
+        description,
+        price_per_ticket: Number(price),
+        ...(creationMode === 'range' 
+          ? { start_ticket: Number(startTicket), end_ticket: Number(endTicket) }
+          : { custom_numbers: uniqueSpecifics }
+        ),
+      };
 
       const res = await fetch('/api/raffles/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          description,
-          price_per_ticket: Number(price),
-          start_ticket: Number(startTicket),
-          end_ticket: Number(endTicket),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -53,6 +79,8 @@ export default function AdminNewRafflePage() {
       setPrice('');
       setStartTicket(0);
       setEndTicket(99);
+      setCustomNumbersInput('');
+      setCreationMode('range');
 
     } catch (err: any) {
       setError(err.message);
@@ -161,40 +189,79 @@ export default function AdminNewRafflePage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="startTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
-                  Inicial *
-                  <span className="text-xl">🔢</span>
-                </label>
-                <input
-                  id="startTicket"
-                  type="number"
-                  required
-                  min="0"
-                  value={startTicket}
-                  onChange={(e) => setStartTicket(Number(e.target.value))}
-                  disabled={isLoading}
-                  className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="endTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
-                  Final *
-                  <span className="text-xl">🏁</span>
-                </label>
-                <input
-                  id="endTicket"
-                  type="number"
-                  required
-                  min="0"
-                  value={endTicket}
-                  onChange={(e) => setEndTicket(Number(e.target.value))}
-                  disabled={isLoading}
-                  className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
-                />
-              </div>
+              <label 
+                className={`relative flex items-center justify-center gap-2 rounded-xl border border-white/10 p-3 text-sm font-bold transition-all cursor-pointer ${
+                  creationMode === 'range' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-[#0a0f16] text-zinc-400 hover:bg-white/5'
+                }`}
+              >
+                <input type="radio" className="sr-only" checked={creationMode === 'range'} onChange={() => setCreationMode('range')} />
+                <span className="text-xl">📏</span> Por Rango
+              </label>
+              <label 
+                className={`relative flex items-center justify-center gap-2 rounded-xl border border-white/10 p-3 text-sm font-bold transition-all cursor-pointer ${
+                  creationMode === 'specific' ? 'bg-amber-500/20 text-amber-500 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-[#0a0f16] text-zinc-400 hover:bg-white/5'
+                }`}
+              >
+                <input type="radio" className="sr-only" checked={creationMode === 'specific'} onChange={() => setCreationMode('specific')} />
+                <span className="text-xl">🎯</span> Específicos
+              </label>
             </div>
+            
+            {creationMode === 'range' ? (
+              <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-4 mt-2">
+                <div>
+                  <label htmlFor="startTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+                    Inicial *
+                    <span className="text-xl">🔢</span>
+                  </label>
+                  <input
+                    id="startTicket"
+                    type="number"
+                    required={creationMode === 'range'}
+                    min="0"
+                    value={startTicket}
+                    onChange={(e) => setStartTicket(Number(e.target.value))}
+                    disabled={isLoading}
+                    className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="endTicket" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+                    Final *
+                    <span className="text-xl">🏁</span>
+                  </label>
+                  <input
+                    id="endTicket"
+                    type="number"
+                    required={creationMode === 'range'}
+                    min="0"
+                    value={endTicket}
+                    onChange={(e) => setEndTicket(Number(e.target.value))}
+                    disabled={isLoading}
+                    className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="col-span-1 sm:col-span-2 mt-2">
+                <label htmlFor="customNumbers" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
+                  Números Específicos (Separados por coma) *
+                  <span className="text-xl">🎯</span>
+                </label>
+                <textarea
+                  id="customNumbers"
+                  required={creationMode === 'specific'}
+                  rows={3}
+                  value={customNumbersInput}
+                  onChange={(e) => setCustomNumbersInput(e.target.value)}
+                  placeholder="Ej. 011, 015, 088, 120"
+                  disabled={isLoading}
+                  className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 placeholder:text-zinc-600 shadow-inner resize-none disabled:opacity-50"
+                />
+                <p className="text-xs text-amber-500/80 mt-2 font-medium">Todos deben tener la misma longitud de dígitos. Se ignorarán los duplicados.</p>
+              </div>
+            )}
           </div>
 
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(59,130,246,0.1)]">

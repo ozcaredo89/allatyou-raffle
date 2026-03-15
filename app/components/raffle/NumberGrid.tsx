@@ -20,8 +20,9 @@ interface TicketStatusMap {
 
 interface NumberGridProps {
   raffle_id: string;
-  start_ticket: number;
-  end_ticket: number;
+  start_ticket?: number | null;
+  end_ticket?: number | null;
+  selectedTickets: string[];
   onTicketSelect?: (ticketNumber: string) => void;
 }
 
@@ -38,13 +39,7 @@ const supabase = createClient(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function padTicketNumber(n: number, digits: number): string {
-  return String(n).padStart(digits, '0');
-}
-
-function getTicketDigits(endTicket: number): number {
-  return String(endTicket).length;
-}
+// Removed helper since we rely on fetched numbers decorators
 
 function statusToStyle(status: TicketStatus | undefined): string {
   switch (status) {
@@ -64,21 +59,19 @@ function statusToStyle(status: TicketStatus | undefined): string {
 
 export default function NumberGrid({
   raffle_id,
-  start_ticket,
-  end_ticket,
+  selectedTickets,
   onTicketSelect,
 }: NumberGridProps) {
   const [statusMap, setStatusMap] = useState<TicketStatusMap>({});
+  const [allTicketNumbers, setAllTicketNumbers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 100;
-  const total_tickets = end_ticket - start_ticket + 1;
-  const totalPages = Math.ceil(total_tickets / itemsPerPage);
-
-  const digits = getTicketDigits(end_ticket);
+  const total_tickets = allTicketNumbers.length || Number.MAX_SAFE_INTEGER; // Will settle after fetch
+  const totalPages = Math.ceil(allTicketNumbers.length / itemsPerPage);
 
   const fetchTickets = useCallback(async () => {
     // Paginate to handle large ticket counts (Supabase default limit = 1000)
@@ -110,11 +103,23 @@ export default function NumberGrid({
     }
 
     const map: TicketStatusMap = {};
+    const numbers: string[] = [];
+    
     for (const ticket of allTickets) {
       map[ticket.ticket_number] = ticket.status;
+      numbers.push(ticket.ticket_number);
     }
 
+    // Sort naturally so 01, 02, 10 are in order
+    numbers.sort((a, b) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (isNaN(numA) || isNaN(numB)) return a.localeCompare(b);
+      return numA - numB;
+    });
+
     setStatusMap(map);
+    setAllTicketNumbers(numbers);
     setLoading(false);
     setError(null);
   }, [raffle_id]);
@@ -219,12 +224,12 @@ export default function NumberGrid({
           gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
         }}
       >
-        {Array.from({ length: total_tickets }, (_, i) => start_ticket + i)
+        {allTicketNumbers
           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-          .map((ticketInt) => {
-            const ticketNumber = padTicketNumber(ticketInt, digits);
+          .map((ticketNumber) => {
             const status = statusMap[ticketNumber];
             const isDisabled = status === 'reserved' || status === 'paid';
+            const isSelected = selectedTickets.includes(ticketNumber);
 
             return (
               <button
@@ -234,8 +239,10 @@ export default function NumberGrid({
                 aria-label={`Número ${ticketNumber} — ${status ?? 'available'}`}
                 onClick={() => handleTicketClick(ticketNumber, status)}
                 className={[
-                  'relative rounded-xl px-2 py-4 text-sm md:text-base font-black text-center tracking-wider overflow-hidden group',
-                  statusToStyle(status),
+                  'relative rounded-xl px-2 py-4 text-sm md:text-base font-black text-center tracking-wider overflow-hidden group transition-all duration-300',
+                  isSelected 
+                    ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-[#0f151f] scale-105 z-20 bg-emerald-500/20 text-white shadow-[0_0_20px_rgba(52,211,153,0.5)]'
+                    : statusToStyle(status),
                 ].join(' ')}
               >
                 <span className="relative z-10">{ticketNumber}</span>
