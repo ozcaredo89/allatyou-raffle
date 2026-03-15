@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 // Types
 // ---------------------------------------------------------------------------
 
-type TicketStatus = 'available' | 'reserved' | 'paid';
+type TicketStatus = 'available' | 'reserved' | 'pending' | 'paid';
 
 interface RafleTicket {
   ticket_number: string;
@@ -44,6 +44,7 @@ const supabase = createClient(
 function statusToStyle(status: TicketStatus | undefined): string {
   switch (status) {
     case 'reserved':
+    case 'pending':
       return 'bg-amber-500/20 border border-amber-500/50 text-amber-400 cursor-not-allowed shadow-[0_0_10px_rgba(245,158,11,0.2)]';
     case 'paid':
       return 'bg-red-500/10 border border-red-500/30 text-red-500/50 cursor-not-allowed';
@@ -227,9 +228,9 @@ export default function NumberGrid({
         {allTicketNumbers
           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
           .map((ticketNumber) => {
-            const status = statusMap[ticketNumber];
-            const isDisabled = status === 'reserved' || status === 'paid';
-            const isSelected = selectedTickets.includes(ticketNumber);
+            const status = statusMap[ticketNumber] || 'available';
+            const isDisabled = status !== 'available';
+            const isSelected = selectedTickets.includes(ticketNumber) && status === 'available';
 
             return (
               <button

@@ -29,8 +29,15 @@ export default function CheckoutModal({
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCopy = (num: string) => {
+    navigator.clipboard.writeText(num);
+    setCopiedNumber(num);
+    setTimeout(() => setCopiedNumber(null), 2000);
+  };
 
   if (!isOpen) return null;
 
@@ -234,15 +241,64 @@ export default function CheckoutModal({
                 <p className="text-xs text-emerald-400/70 mt-1">Sube tu comprobante en menos de 15 mins</p>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-zinc-400">
-                  Transfiere exactamente <strong className="text-white text-lg">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(totalPrice)}</strong> a:
+              <div className="flex flex-col gap-4 text-left">
+                <p className="text-sm font-medium text-zinc-400 text-center">
+                  Transfiere exactamente <strong className="text-white text-lg ml-1">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(totalPrice)}</strong> a:
                 </p>
-                <div className="mx-auto mt-3 inline-block rounded-xl border border-white/10 bg-[#0a0f16] px-8 py-4 shadow-inner">
-                  <p className="text-2xl font-black tracking-wider text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
-                    Nequi: 314 736 9247
-                  </p>
-                  <p className="mt-1.5 text-xs font-semibold text-zinc-500 tracking-wide uppercase">A nombre de: Jerson Mur****</p>
+
+                {/* Tarjeta 1: Nequi */}
+                <div className="relative overflow-hidden rounded-xl border border-fuchsia-500/30 bg-[#1f0d2b] p-4 shadow-[0_0_15px_rgba(217,70,239,0.15)] transition-all hover:border-fuchsia-500/50">
+                  <div className="absolute top-2 right-2 p-2 opacity-30 select-none">
+                    <span className="text-4xl">📱</span>
+                  </div>
+                  <div className="relative z-10 flex flex-col gap-1">
+                    <h5 className="text-xs font-black uppercase tracking-widest text-fuchsia-400">Opción Principal</h5>
+                    <p className="text-sm font-bold text-white">Realiza tu pago con Nequi</p>
+                    
+                    <div className="mt-2 flex items-center justify-between rounded-lg bg-black/40 border border-fuchsia-500/10 p-3">
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xl font-black tracking-tight text-fuchsia-400">314 736 9247</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mt-1">A nombre de: Jerson Mur****</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('3147369247')}
+                        className="flex h-9 w-9 items-center justify-center rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 transition-colors hover:bg-fuchsia-500/20 active:scale-95"
+                        title="Copiar Nequi"
+                      >
+                        {copiedNumber === '3147369247' ? '✓' : '📋'}
+                      </button>
+                    </div>
+                    
+                    <p className="mt-3 text-xs font-semibold text-fuchsia-300/80">
+                      Le tomas pantallazo y lo subes aquí abajo 👇🏻
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tarjeta 2: Bancolombia */}
+                <div className="relative overflow-hidden rounded-xl border border-yellow-500/30 bg-[#181a14] p-4 shadow-[0_0_15px_rgba(234,179,8,0.1)] transition-all hover:border-yellow-500/50">
+                  <div className="absolute top-2 right-2 p-2 opacity-30 select-none">
+                    <span className="text-4xl">🏦</span>
+                  </div>
+                  <div className="relative z-10 flex flex-col gap-1">
+                    <p className="text-sm font-bold text-white">Pago con cuenta ahorro Bancolombia</p>
+                    
+                    <div className="mt-2 flex items-center justify-between rounded-lg bg-black/40 border border-yellow-500/10 p-3">
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xl font-black tracking-tight text-yellow-500">733-0001 77-27</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mt-1">A nombre de: Jerson Mur****</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('73300017727')}
+                        className="flex h-9 w-9 items-center justify-center rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 transition-colors hover:bg-yellow-500/20 active:scale-95"
+                        title="Copiar Bancolombia"
+                      >
+                        {copiedNumber === '73300017727' ? '✓' : '📋'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

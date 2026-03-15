@@ -72,11 +72,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Build the public URL using the R2 public domain
     const publicUrl = `${process.env.R2_PUBLIC_URL!.replace(/\/$/, '')}/${fileName}`;
 
-    // Update the tickets: status → 'pending', save proof URL
+    // Update the tickets: status → 'paid', save proof URL
     const { data: updatedTickets, error: updateError } = await supabase
       .from('rafle_tickets')
       .update({
-        status: 'pending',
+        status: 'paid',
         payment_proof_url: publicUrl,
       })
       .eq('raffle_id', raffle_id)
