@@ -123,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               from: fromEmail,
               to: [adminEmail],
               subject: `Nuevo comprobante de pago - Tickets: ${ticket_numbers.join(', ')}`,
-              text: `${customerData.name} acaba de subir el comprobante para los tickets ${ticket_numbers.join(', ')}. Aquí está el link de la foto para que lo apruebes: ${publicUrl}`
+              text: `${customerData.name} acaba de subir el comprobante para los tickets ${ticket_numbers.join(', ')}. Por favor ingresa al panel para auditarlo y aprobarlo: https://raffle.allatyou.com/admin/raffles`
             });
           } else {
             console.error('ALLATYOU_ADMIN_EMAIL is not set in environment variables');

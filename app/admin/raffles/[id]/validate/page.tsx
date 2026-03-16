@@ -15,6 +15,8 @@ interface ValidationTicket {
   status: 'available' | 'reserved' | 'pending' | 'paid';
   reserved_at: string | null;
   payment_proof_url: string | null;
+  admin_notes?: string | null;
+  customer_id?: string | null;
   customer?: {
     name: string;
     phone: string;
@@ -33,6 +35,9 @@ export default function ValidationPanelPage({
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'reserved' | 'paid'>('pending');
 
+  const [notesState, setNotesState] = useState<Record<string, string>>({});
+  const [editingCustomer, setEditingCustomer] = useState<{ticket_id: string; name: string; phone: string} | null>(null);
+
   const fetchTickets = async () => {
     setLoading(true);
     setError(null);
@@ -45,7 +50,8 @@ export default function ValidationPanelPage({
         status,
         reserved_at,
         payment_proof_url,
-        customer_id
+        customer_id,
+        admin_notes
       `)
       .eq('raffle_id', raffle_id)
       .neq('status', 'available')
@@ -83,6 +89,13 @@ export default function ValidationPanelPage({
       customer: t.customer_id ? customersMap[t.customer_id] : null,
     }));
 
+    // Initialize notes state
+    const initialNotes: Record<string, string> = {};
+    merged.forEach(t => {
+      initialNotes[t.id] = t.admin_notes || '';
+    });
+    setNotesState(initialNotes);
+
     setTickets(merged as ValidationTicket[]);
     setLoading(false);
   };
@@ -100,13 +113,42 @@ export default function ValidationPanelPage({
       const res = await fetch('/api/raffles/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket_id, action }),
+        body: JSON.stringify({ 
+          ticket_id, 
+          action,
+          admin_notes: notesState[ticket_id]
+        }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al procesar la acción.');
 
       // Refresh list
+      fetchTickets();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!editingCustomer) return;
+    
+    try {
+      const res = await fetch('/api/raffles/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ticket_id: editingCustomer.ticket_id, 
+          action: 'edit_customer',
+          customer_name: editingCustomer.name,
+          customer_phone: editingCustomer.phone
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar cliente.');
+
+      setEditingCustomer(null);
       fetchTickets();
     } catch (err: any) {
       alert(err.message);
@@ -168,6 +210,7 @@ export default function ValidationPanelPage({
                    <th className="px-6 py-4 font-bold">Cliente</th>
                    <th className="px-6 py-4 font-bold">Estado</th>
                    <th className="px-6 py-4 font-bold">Comprobante</th>
+                   <th className="px-6 py-4 font-bold">Notas</th>
                    <th className="px-6 py-4 font-bold text-right">Acciones</th>
                  </tr>
                </thead>
@@ -189,6 +232,7 @@ export default function ValidationPanelPage({
                        <td className="px-6 py-4">
                          <div className="font-bold text-white">{ticket.customer?.name || 'Desconocido'}</div>
                          <div className="text-zinc-500 text-xs mt-0.5">{ticket.customer?.phone || 'Sin WhatsApp'}</div>
+                         <button onClick={() => setEditingCustomer({ticket_id: ticket.id, name: ticket.customer?.name || '', phone: ticket.customer?.phone || ''})} className="text-xs text-blue-400 hover:text-blue-300 mt-1 inline-block font-semibold">✏️ Editar</button>
                        </td>
                        <td className="px-6 py-4">
                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -207,6 +251,15 @@ export default function ValidationPanelPage({
                          ) : (
                            <span className="text-zinc-600 text-xs italic">Sin adjunto</span>
                          )}
+                       </td>
+                       <td className="px-6 py-4">
+                         <input 
+                           type="text" 
+                           value={notesState[ticket.id] || ''}
+                           onChange={(e) => setNotesState(prev => ({...prev, [ticket.id]: e.target.value}))}
+                           placeholder="Notas admin..."
+                           className="w-full min-w-[120px] bg-[#0a0f16] border border-white/10 rounded-md px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50"
+                         />
                        </td>
                        <td className="px-6 py-4 text-right">
                          <div className="flex items-center justify-end gap-2">
@@ -235,6 +288,33 @@ export default function ValidationPanelPage({
              </table>
            </div>
         </div>
+
+        {/* Modal de Edición de Cliente en Cascada */}
+        {editingCustomer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-[#0f151f] border border-white/10 p-6 shadow-2xl">
+              <h3 className="text-xl font-bold text-white mb-4">Editar Cliente</h3>
+              <p className="text-xs text-zinc-400 mb-4">Los cambios se reflejarán en todos los tickets reservados por este usuario.</p>
+              
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="text-xs font-bold text-zinc-400">Nombre Completo</label>
+                  <input type="text" value={editingCustomer.name} onChange={e => setEditingCustomer({...editingCustomer, name: e.target.value})} className="mt-1 w-full bg-[#0a0f16] border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-zinc-400">WhatsApp</label>
+                  <input type="text" value={editingCustomer.phone} onChange={e => setEditingCustomer({...editingCustomer, phone: e.target.value})} className="mt-1 w-full bg-[#0a0f16] border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                </div>
+                
+                <div className="flex items-center justify-end gap-3 mt-4">
+                  <button onClick={() => setEditingCustomer(null)} className="px-4 py-2 text-sm font-bold text-zinc-400 hover:text-white transition-colors">Cancelar</button>
+                  <button onClick={handleSaveCustomer} className="px-5 py-2.5 text-sm font-bold bg-blue-600 hover:bg-blue-500 rounded-lg text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all">Guardar Cascada</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

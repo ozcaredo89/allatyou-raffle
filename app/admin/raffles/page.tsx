@@ -294,6 +294,14 @@ export default function AdminRafflesPage() {
                          >
                            ✏️ Editar
                          </button>
+                         <Link
+                           href={`/admin/raffles/${raffle.id}/validate`}
+                           className="flex-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 py-2 text-xs font-bold text-center text-emerald-400 transition-colors hover:bg-emerald-500/20 hover:text-emerald-300"
+                         >
+                           💰 Auditar Pagos
+                         </Link>
+                       </div>
+                       <div className="flex gap-2">
                          <button
                            onClick={() => handleToggleStatus(raffle)}
                            className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"

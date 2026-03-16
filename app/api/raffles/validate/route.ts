@@ -9,25 +9,19 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const { ticket_id, action } = await request.json();
+    const { ticket_id, action, admin_notes, customer_name, customer_phone } = await request.json();
 
-    if (!ticket_id || !action || !['approve', 'reject'].includes(action)) {
+    if (!ticket_id || !action || !['approve', 'reject', 'edit_customer'].includes(action)) {
       return NextResponse.json(
-        { error: 'Invalid payload: required ticket_id and action (approve | reject)' },
+        { error: 'Invalid payload: required ticket_id and action (approve | reject | edit_customer)' },
         { status: 400 }
       );
     }
 
-    // First fetch ticket details including customer and raffle info for the email
+    // First fetch ticket details including customer and raffle info
     const { data: ticket, error: fetchError } = await supabase
       .from('rafle_tickets')
-      .select(`
-        id,
-        ticket_number,
-        status,
-        customer_id,
-        raffle_id
-      `)
+      .select('id, ticket_number, status, customer_id, raffle_id')
       .eq('id', ticket_id)
       .single();
 
@@ -35,28 +29,48 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Ticket no encontrado.' }, { status: 404 });
     }
 
+    // SCENARIO 1: CASCADE EDIT OF CUSTOMER
+    if (action === 'edit_customer') {
+      if (!ticket.customer_id) return NextResponse.json({ error: 'No hay cliente asociado a este ticket.' }, { status: 400 });
+      if (!customer_name || !customer_phone) return NextResponse.json({ error: 'Nombre y teléfono requeridos.' }, { status: 400 });
+
+      const { error: updateCustomerError } = await supabase
+        .from('rafle_customers')
+        .update({ name: customer_name, phone: customer_phone })
+        .eq('id', ticket.customer_id);
+
+      if (updateCustomerError) throw updateCustomerError;
+      return NextResponse.json({ success: true, message: 'Cliente actualizado exitosamente.' });
+    }
+
+    // SCENARIO 2: DEEP CLEAN REJECTION
     if (action === 'reject') {
+      const updatePayload: any = {
+        status: 'available',
+        customer_id: null,
+        reserved_at: null,
+        payment_proof_url: null,
+      };
+      
+      if (admin_notes !== undefined) updatePayload.admin_notes = admin_notes || null;
+
       const { error: updateError } = await supabase
         .from('rafle_tickets')
-        .update({
-          status: 'available',
-          customer_id: null,
-          reserved_at: null,
-          payment_proof_url: null,
-        })
+        .update(updatePayload)
         .eq('id', ticket_id);
 
       if (updateError) throw updateError;
-      
       return NextResponse.json({ success: true, message: 'Ticket liberado exitosamente.' });
     }
 
+    // SCENARIO 3: APPROVE PAYMENT
     if (action === 'approve') {
+      const updatePayload: any = { status: 'paid' };
+      if (admin_notes !== undefined) updatePayload.admin_notes = admin_notes;
+
       const { error: updateError } = await supabase
         .from('rafle_tickets')
-        .update({
-          status: 'paid',
-        })
+        .update(updatePayload)
         .eq('id', ticket_id);
 
       if (updateError) throw updateError;

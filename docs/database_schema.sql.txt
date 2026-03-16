@@ -1,16 +1,20 @@
+-- Schema actualizado (Marzo 2026) -> Incluye refactorización de estados, Deep Clean y Soporte Concurrente Híbrido
+
 -- 1. Tabla de Configuración de la Rifa
-CREATE TABLE rafle_raffles (
+CREATE TABLE public.rafle_raffles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
     price_per_ticket NUMERIC(10, 2) NOT NULL,
     total_tickets INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    start_ticket INTEGER,
+    end_ticket INTEGER,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled', 'paused')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 2. Tabla de Compradores
-CREATE TABLE rafle_customers (
+CREATE TABLE public.rafle_customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -19,20 +23,73 @@ CREATE TABLE rafle_customers (
 );
 
 -- 3. Tabla de Tickets (Inventario y Control de Concurrencia)
-CREATE TABLE rafle_tickets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    raffle_id UUID NOT NULL REFERENCES rafle_raffles(id) ON DELETE CASCADE,
-    ticket_number TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'paid')),
-    customer_id UUID REFERENCES rafle_customers(id) ON DELETE SET NULL,
-    payment_proof_url TEXT,
-    reserved_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    
-    -- Constraint crítico: Evita que dos personas compren el mismo número en la misma rifa
-    CONSTRAINT unique_ticket_per_raffle UNIQUE (raffle_id, ticket_number)
-);
+CREATE TABLE public.rafle_tickets (
+  id uuid not null default gen_random_uuid (),
+  raffle_id uuid not null,
+  ticket_number text not null,
+  status text not null default 'available'::text,
+  customer_id uuid null,
+  payment_proof_url text null,
+  reserved_at timestamp with time zone null,
+  created_at timestamp with time zone not null default timezone ('utc'::text, now()),
+  admin_notes text null,
+  constraint rafle_tickets_pkey primary key (id),
+  constraint unique_ticket_per_raffle unique (raffle_id, ticket_number),
+  constraint rafle_tickets_customer_id_fkey foreign KEY (customer_id) references rafle_customers (id) on delete set null,
+  constraint rafle_tickets_raffle_id_fkey foreign KEY (raffle_id) references rafle_raffles (id) on delete CASCADE,
+  constraint rafle_tickets_status_check check (
+    (
+      status = any (
+        array[
+          'available'::text,
+          'reserved'::text,
+          'pending'::text,
+          'paid'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
 
 -- Índices adicionales para mejorar la velocidad de lectura
-CREATE INDEX idx_rafle_tickets_raffle_id ON rafle_tickets(raffle_id);
-CREATE INDEX idx_rafle_tickets_status ON rafle_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_rafle_tickets_raffle_id ON public.rafle_tickets USING btree (raffle_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_rafle_tickets_status ON public.rafle_tickets USING btree (status) TABLESPACE pg_default;
+
+
+-- 4. Función RPC para reserva atómica y concurrente de boletos
+CREATE OR REPLACE FUNCTION reserve_tickets(
+  p_raffle_id UUID,
+  p_customer_id UUID,
+  p_ticket_numbers TEXT[]
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_updated_count INT;
+  v_requested_count INT;
+BEGIN
+  -- Obtenemos la cantidad de tickets que el usuario quiere comprar
+  v_requested_count := array_length(p_ticket_numbers, 1);
+
+  -- Intentamos actualizar todos los tickets solicitados de un solo golpe
+  WITH updated AS (
+    UPDATE public.rafle_tickets
+    SET 
+      status = 'reserved',
+      customer_id = p_customer_id,
+      reserved_at = timezone('utc'::text, now())
+    WHERE 
+      raffle_id = p_raffle_id 
+      AND ticket_number = ANY(p_ticket_numbers)
+      AND status = 'available'
+    RETURNING id
+  )
+  SELECT count(*) INTO v_updated_count FROM updated;
+
+  -- Si la cantidad de actualizados no coincide con los solicitados, alguien nos ganó un número
+  IF v_updated_count <> v_requested_count THEN
+    -- RAISE EXCEPTION hace un ROLLBACK automático en PostgreSQL
+    RAISE EXCEPTION 'Error de concurrencia: Uno o más tickets ya no están disponibles.';
+  END IF;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
