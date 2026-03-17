@@ -301,6 +301,12 @@ export default function AdminRafflesPage() {
                            💰 Auditar Pagos
                          </Link>
                        </div>
+                       <Link
+                         href={`/admin/raffles/${raffle.id}/edit-tickets`}
+                         className="w-full rounded-lg border border-blue-500/20 bg-blue-500/10 py-2 text-xs font-bold text-center text-blue-400 transition-colors hover:bg-blue-500/20 hover:text-blue-300"
+                       >
+                         🎫 Editar Boletas
+                       </Link>
                        <div className="flex gap-2">
                          <button
                            onClick={() => handleToggleStatus(raffle)}

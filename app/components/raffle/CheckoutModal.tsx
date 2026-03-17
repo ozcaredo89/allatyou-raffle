@@ -28,7 +28,6 @@ export default function CheckoutModal({
   const [error, setError] = useState<string | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +76,6 @@ export default function CheckoutModal({
         return;
       }
       setFile(selected);
-      setPreviewUrl(URL.createObjectURL(selected));
       setError(null);
     }
   };
@@ -118,8 +116,6 @@ export default function CheckoutModal({
     setName('');
     setPhone('');
     setFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
     setError(null);
     onClose();
   };
@@ -311,7 +307,7 @@ export default function CheckoutModal({
                   className="hidden"
                 />
 
-                {!previewUrl ? (
+                {!file ? (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -323,20 +319,17 @@ export default function CheckoutModal({
                     </span>
                   </button>
                 ) : (
-                  <div className="relative mx-auto mt-2 h-48 w-full overflow-hidden rounded-xl border border-white/20 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewUrl}
-                      alt="Comprobante"
-                      className="h-full w-full object-cover"
-                    />
+                  <div className="flex items-center justify-between rounded-xl border border-white/20 bg-white/5 p-4 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">📄</span>
+                      <span className="text-sm font-medium text-zinc-300 truncate">{file.name}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
                         setFile(null);
-                        setPreviewUrl(null);
                       }}
-                      className="absolute right-2 top-2 rounded-full border border-white/20 bg-black/60 p-2 text-white backdrop-blur-md transition-colors hover:bg-red-500"
+                      className="ml-2 rounded-full border border-white/20 bg-black/60 p-2 text-white backdrop-blur-md transition-colors hover:bg-red-500 flex-shrink-0"
                     >
                       ✕
                     </button>

@@ -19,6 +19,10 @@ export default async function Page() {
     .limit(1)
     .maybeSingle();
 
+  if (error) {
+    console.error('Error fetching raffle:', error);
+  }
+
   if (error || !activeRaffle) {
     return (
       <div className="flex min-h-screen items-center justify-center p-8 bg-zinc-50 dark:bg-zinc-950">
