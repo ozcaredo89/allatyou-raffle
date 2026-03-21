@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { Trash2, Edit2, AlertCircle, CheckCircle2, Clock, CheckSquare, Square } from 'lucide-react';
 
 interface Ticket {
   id: string;
@@ -29,11 +28,11 @@ export default function TicketsTable({ raffleId, tickets: initialTickets, onTick
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'single' | 'bulk'; id?: string } | null>(null);
 
-  const statusColors: Record<string, { bg: string; text: string; icon: any }> = {
-    available: { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', icon: <Square className="w-4 h-4" /> },
-    reserved: { bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', icon: <Clock className="w-4 h-4" /> },
-    pending: { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', icon: <AlertCircle className="w-4 h-4" /> },
-    paid: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', icon: <CheckCircle2 className="w-4 h-4" /> },
+  const statusColors: Record<string, { bg: string; text: string; icon: string }> = {
+    available: { bg: 'bg-zinc-500/10 border border-zinc-500/20', text: 'text-zinc-400', icon: '🎫' },
+    reserved: { bg: 'bg-yellow-500/10 border border-yellow-500/20', text: 'text-yellow-400', icon: '⏳' },
+    pending: { bg: 'bg-amber-500/10 border border-amber-500/20', text: 'text-amber-500', icon: '⚠️' },
+    paid: { bg: 'bg-emerald-500/10 border border-emerald-500/20', text: 'text-emerald-400', icon: '💎' },
   };
 
   const handleSelectAll = () => {
@@ -165,140 +164,135 @@ export default function TicketsTable({ raffleId, tickets: initialTickets, onTick
 
       {/* Bulk Actions Bar */}
       {selectedIds.size > 0 && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-          <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-            {selectedIds.size} ticket{selectedIds.size !== 1 ? 's' : ''} selected
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+          <span className="text-sm font-bold text-blue-400">
+            {selectedIds.size} boleta{selectedIds.size !== 1 ? 's' : ''} seleccionada{selectedIds.size !== 1 ? 's' : ''}
           </span>
           <button
             onClick={() => setDeleteConfirm({ type: 'bulk' })}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:bg-red-400"
+            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition-all shadow-[0_0_10px_rgba(220,38,38,0.3)] hover:bg-red-500 hover:scale-105 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:scale-100"
           >
-            <Trash2 className="w-4 h-4" />
-            Delete Selected
+            🗑️ Eliminar Seleccionadas
           </button>
         </div>
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+      <div className="overflow-x-auto rounded-xl border border-white/5 bg-[#0f151f] shadow-xl">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-[#141b26] border-b border-white/5 text-xs uppercase tracking-widest text-zinc-500">
             <tr>
-              <th className="w-12 px-4 py-3 text-left">
+              <th className="w-12 px-6 py-4">
                 <button
                   onClick={handleSelectAll}
-                  className="rounded border border-zinc-300 dark:border-zinc-600 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  title={selectedIds.size === tickets.length ? 'Deselect all' : 'Select all'}
+                  className="rounded border border-white/20 p-1 hover:bg-white/10 transition-colors flex items-center justify-center w-6 h-6"
+                  title={selectedIds.size === tickets.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
                 >
                   {selectedIds.size === tickets.length ? (
-                    <CheckSquare className="w-4 h-4 text-blue-600" />
-                  ) : (
-                    <Square className="w-4 h-4" />
-                  )}
+                    <span className="text-blue-400 font-bold text-xs">✓</span>
+                  ) : null}
                 </button>
               </th>
-              <th className="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-300">Ticket #</th>
-              <th className="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-300">Status</th>
-              <th className="px-4 py-3 text-left font-semibold text-zinc-700 dark:text-zinc-300">Reserved At</th>
-              <th className="px-4 py-3 text-right font-semibold text-zinc-700 dark:text-zinc-300">Actions</th>
+              <th className="px-6 py-4 font-bold">Ticket #</th>
+              <th className="px-6 py-4 font-bold">Estado</th>
+              <th className="px-6 py-4 font-bold">Reserva En</th>
+              <th className="px-6 py-4 font-bold text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-white/5">
             {sortedTickets.map((ticket) => (
-              <tr key={ticket.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
-                <td className="px-4 py-3">
+              <tr key={ticket.id} className="hover:bg-white/[0.02] transition-colors group">
+                <td className="px-6 py-4">
                   <button
                     onClick={() => handleSelectTicket(ticket.id)}
                     disabled={editingId !== null}
-                    className="rounded border border-zinc-300 dark:border-zinc-600 p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+                    className="rounded border border-white/20 p-1 hover:bg-white/10 disabled:opacity-50 transition-colors flex items-center justify-center w-6 h-6"
                   >
                     {selectedIds.has(ticket.id) ? (
-                      <CheckSquare className="w-4 h-4 text-blue-600" />
-                    ) : (
-                      <Square className="w-4 h-4" />
-                    )}
+                      <span className="text-blue-400 font-bold text-xs">✓</span>
+                    ) : null}
                   </button>
                 </td>
 
                 {/* Ticket Number Cell */}
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {editingId === ticket.id ? (
                     <input
                       type="text"
                       value={editValues.number}
                       onChange={(e) => setEditValues((prev) => ({ ...prev, number: e.target.value }))}
-                      className="w-full rounded border border-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-sm font-mono font-medium text-zinc-900 dark:text-white"
-                      placeholder="Ticket number"
+                      className="w-full rounded-lg border border-blue-500/50 bg-[#0a0f16] px-3 py-1.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-blue-400"
+                      placeholder="Número"
                     />
                   ) : (
-                    <span className="font-mono font-semibold text-zinc-900 dark:text-white">{ticket.ticket_number}</span>
+                    <span className="font-mono text-lg font-bold text-emerald-400">{ticket.ticket_number}</span>
                   )}
                 </td>
 
                 {/* Status Cell */}
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {editingId === ticket.id ? (
                     <select
                       value={editValues.status}
                       onChange={(e) => setEditValues((prev) => ({ ...prev, status: e.target.value }))}
-                      className="rounded border border-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-sm font-medium text-zinc-900 dark:text-white"
+                      className="rounded-lg border border-blue-500/50 bg-[#0a0f16] px-2 py-1.5 text-sm font-bold text-white focus:outline-none focus:border-blue-400"
                     >
-                      <option value="available">Available</option>
-                      <option value="reserved">Reserved</option>
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
+                      <option value="available">Disponible</option>
+                      <option value="reserved">Reservado</option>
+                      <option value="pending">Auditoría</option>
+                      <option value="paid">Pagado</option>
                     </select>
                   ) : (
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${statusColors[ticket.status]?.bg} ${statusColors[ticket.status]?.text}`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusColors[ticket.status]?.bg} ${statusColors[ticket.status]?.text}`}
                     >
-                      {statusColors[ticket.status]?.icon}
-                      {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                      <span className="text-sm">{statusColors[ticket.status]?.icon}</span>
+                      {ticket.status === 'pending' ? 'Auditoría' : ticket.status === 'paid' ? 'Pagado' : ticket.status === 'reserved' ? 'Reservado' : 'Disponible'}
                     </span>
                   )}
                 </td>
 
                 {/* Reserved At Cell */}
-                <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">
-                  {ticket.reserved_at ? new Date(ticket.reserved_at).toLocaleString() : '—'}
+                <td className="px-6 py-4 text-xs font-medium text-zinc-500">
+                  {ticket.reserved_at ? new Date(ticket.reserved_at).toLocaleString('es-CO') : '—'}
                 </td>
 
                 {/* Actions Cell */}
-                <td className="px-4 py-3 text-right">
+                <td className="px-6 py-4 text-right">
                   {editingId === ticket.id ? (
                     <div className="flex justify-end gap-2">
+                       <button
+                        onClick={() => setEditingId(null)}
+                        disabled={loading}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-zinc-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
                       <button
                         onClick={() => handleEditSave(ticket.id)}
                         disabled={loading}
-                        className="rounded bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:bg-green-400"
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-[0_0_10px_rgba(5,150,105,0.3)] hover:bg-emerald-500 hover:scale-105 transition-all disabled:bg-zinc-800 disabled:text-zinc-500 disabled:scale-100"
                       >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        disabled={loading}
-                        className="rounded bg-zinc-400 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-500 disabled:bg-zinc-300"
-                      >
-                        Cancel
+                        Guardar
                       </button>
                     </div>
                   ) : (
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleEditStart(ticket)}
                         disabled={selectedIds.size > 0}
-                        className="rounded bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-zinc-300"
-                        title="Edit"
+                        className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/30 transition-colors disabled:opacity-50"
+                        title="Editar"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        ✏️ Editar
                       </button>
                       <button
                         onClick={() => setDeleteConfirm({ type: 'single', id: ticket.id })}
-                        className="rounded bg-red-600 p-2 text-white hover:bg-red-700"
-                        title="Delete"
+                        className="rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
+                        title="Eliminar"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        🗑️ Borrar
                       </button>
                     </div>
                   )}
@@ -311,36 +305,38 @@ export default function TicketsTable({ raffleId, tickets: initialTickets, onTick
 
       {/* No Tickets */}
       {tickets.length === 0 && (
-        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 py-8 text-center">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No tickets found</p>
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 py-12 text-center shadow-inner mt-4">
+          <p className="text-sm font-bold text-zinc-500 uppercase tracking-widest">No hay boletas disponibles</p>
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200 dark:border-zinc-800">
-            <div className="border-b border-zinc-200 dark:border-zinc-800 p-6">
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Confirm Delete</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[#0f151f] shadow-[0_0_50px_rgba(220,38,38,0.2)] border border-red-500/20 overflow-hidden">
+            <div className="border-b border-white/5 bg-red-500/10 p-5">
+              <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
+                <span className="text-red-500">⚠️</span> Confirmar Eliminación
+              </h3>
             </div>
             <div className="p-6">
               {deleteConfirm.type === 'bulk' ? (
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Are you sure you want to delete <strong>{selectedIds.size}</strong> ticket{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+                <p className="text-sm text-zinc-300 font-medium">
+                  ¿Estás seguro de que deseas eliminar permanentemente <strong>{selectedIds.size}</strong> boleta{selectedIds.size !== 1 ? 's' : ''}? Esta acción <strong className="text-red-400">no se puede deshacer</strong>.
                 </p>
               ) : (
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Are you sure you want to delete ticket <strong>{tickets.find((t) => t.id === deleteConfirm.id)?.ticket_number}</strong>? This action cannot be undone.
+                <p className="text-sm text-zinc-300 font-medium">
+                  ¿Estás seguro de que deseas eliminar la boleta <strong className="text-white text-base">#{tickets.find((t) => t.id === deleteConfirm.id)?.ticket_number}</strong>? Esta acción <strong className="text-red-400">no se puede deshacer</strong>.
                 </p>
               )}
             </div>
-            <div className="border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2 p-6">
+            <div className="border-t border-white/5 bg-[#141b26] flex justify-end gap-3 p-5">
               <button
                 onClick={() => setDeleteConfirm(null)}
                 disabled={loading}
-                className="rounded-lg border border-zinc-300 dark:border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50"
+                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={() => {
@@ -351,9 +347,9 @@ export default function TicketsTable({ raffleId, tickets: initialTickets, onTick
                   }
                 }}
                 disabled={loading}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-400"
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_0_15px_rgba(220,38,38,0.4)] hover:bg-red-500 hover:scale-[1.02] transition-all disabled:scale-100 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none"
               >
-                {loading ? 'Deleting...' : 'Delete'}
+                {loading ? 'Eliminando...' : 'Sí, Eliminar'}
               </button>
             </div>
           </div>

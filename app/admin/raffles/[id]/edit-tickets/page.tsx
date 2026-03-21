@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import TicketsTable from '@/app/components/admin/TicketsTable';
 import { createClient } from '@supabase/supabase-js';
 
@@ -107,27 +106,26 @@ export default function EditTicketsPage({ params }: EditTicketsPageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-blue-900 to-zinc-900 flex items-center justify-center p-6">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
-          <p className="text-white mt-4">Cargando...</p>
-        </div>
+      <div className="min-h-screen bg-[#0a0f16] flex items-center justify-center p-4">
+         <div className="relative flex items-center justify-center h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-t-2 border-emerald-500 animate-spin" />
+            <div className="absolute inset-2 rounded-full border-b-2 border-teal-400 animate-spin-reverse" />
+          </div>
       </div>
     );
   }
 
   if (error || !raffle) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-blue-900 to-zinc-900 p-6">
-        <div className="mx-auto max-w-6xl">
+      <div className="min-h-screen bg-[#0a0f16] p-4 md:p-8 font-sans text-white">
+        <div className="mx-auto max-w-7xl">
           <Link
             href="/admin/raffles"
-            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-emerald-500 hover:text-emerald-400 text-sm font-bold flex items-center gap-2 mb-6"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Raffles
+            ← Volver al Listado
           </Link>
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-red-400">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-red-400 font-bold shadow-[0_0_15px_rgba(239,68,68,0.1)]">
             <p>{error || 'Rifa no encontrada'}</p>
           </div>
         </div>
@@ -136,50 +134,56 @@ export default function EditTicketsPage({ params }: EditTicketsPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-blue-900 to-zinc-900 p-6">
-      <div className="mx-auto max-w-6xl">
+    <div className="min-h-screen bg-[#0a0f16] p-4 md:p-8 font-sans text-white">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/admin/raffles"
-            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-emerald-500 hover:text-emerald-400 text-sm font-bold flex items-center gap-2 mb-4"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Raffles
+            ← Volver al Listado
           </Link>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-md p-6 shadow-xl">
-            <h1 className="text-3xl font-black text-white mb-2">{raffle.name}</h1>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <div className="rounded-2xl border border-white/5 bg-[#0f151f] p-6 shadow-xl mb-6">
+            <h1 className="text-3xl font-black text-white mb-6 tracking-tight drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">{raffle.name}</h1>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
-                <span className="text-zinc-400">Total Tickets</span>
-                <p className="text-xl font-bold text-blue-400">{raffle.total_tickets}</p>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Total Boletas</span>
+                <p className="text-xl font-bold text-white mt-1">{raffle.total_tickets}</p>
               </div>
-              {raffle.start_ticket && raffle.end_ticket && (
+              {raffle.start_ticket !== null && raffle.end_ticket !== null ? (
                 <div>
-                  <span className="text-zinc-400">Range</span>
-                  <p className="text-xl font-bold text-blue-400">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Rango Segmentado</span>
+                  <p className="font-mono text-xl font-bold text-blue-400 mt-1">
                     {raffle.start_ticket} - {raffle.end_ticket}
                   </p>
                 </div>
+              ) : (
+                <div>
+                   <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Tipo de Rifa</span>
+                   <p className="text-xl font-bold text-blue-400 mt-1">
+                     Núm. Específicos
+                   </p>
+                 </div>
               )}
               <div>
-                <span className="text-zinc-400">Status</span>
-                <p className={`text-xl font-bold ${raffle.status === 'active' ? 'text-green-400' : 'text-yellow-400'}`}>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Estado General</span>
+                <p className={`text-xl font-bold mt-1 ${raffle.status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {raffle.status.charAt(0).toUpperCase() + raffle.status.slice(1)}
                 </p>
               </div>
               <div>
-                <span className="text-zinc-400">Tickets Count</span>
-                <p className="text-xl font-bold text-purple-400">{tickets.length}</p>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Boletas Generadas</span>
+                <p className="text-xl font-bold text-fuchsia-400 mt-1">{tickets.length}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Tickets Table */}
-        <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-md p-6 shadow-xl">
-          <h2 className="text-xl font-bold text-white mb-4">Manage Tickets</h2>
+        <div className="rounded-2xl border border-white/5 bg-[#0f151f] p-6 shadow-xl">
+          <h2 className="text-xl font-black text-white mb-6">Administrador Maestro de Boletas</h2>
           <TicketsTable
             raffleId={raffleId}
             tickets={tickets}
