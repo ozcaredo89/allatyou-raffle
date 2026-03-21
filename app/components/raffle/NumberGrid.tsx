@@ -24,6 +24,7 @@ interface NumberGridProps {
   end_ticket?: number | null;
   selectedTickets: string[];
   onTicketSelect?: (ticketNumber: string) => void;
+  onDataLoaded?: (availableTickets: string[], ticketDigits: number) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ export default function NumberGrid({
   raffle_id,
   selectedTickets,
   onTicketSelect,
+  onDataLoaded,
 }: NumberGridProps) {
   const [statusMap, setStatusMap] = useState<TicketStatusMap>({});
   const [allTicketNumbers, setAllTicketNumbers] = useState<string[]>([]);
@@ -123,7 +125,14 @@ export default function NumberGrid({
     setAllTicketNumbers(numbers);
     setLoading(false);
     setError(null);
-  }, [raffle_id]);
+
+    // Provide available tickets to parent (e.g. for LuckySlot)
+    if (onDataLoaded && numbers.length > 0) {
+      const available = numbers.filter(n => (map[n] || 'available') === 'available');
+      const digits = numbers[0].length;
+      onDataLoaded(available, digits);
+    }
+  }, [raffle_id, onDataLoaded]);
 
   // Initial fetch + polling every 30 seconds for live updates
   useEffect(() => {
@@ -151,10 +160,21 @@ export default function NumberGrid({
         (payload) => {
           const updated = payload.new as RafleTicket;
           if (updated?.ticket_number && updated?.status) {
-            setStatusMap((prev) => ({
-              ...prev,
-              [updated.ticket_number]: updated.status,
-            }));
+            setStatusMap((prev) => {
+              const newMap = {
+                ...prev,
+                [updated.ticket_number]: updated.status,
+              };
+              
+              // Recalculate and emit available tickets on realtime update
+              if (onDataLoaded && allTicketNumbers.length > 0) {
+                 const available = allTicketNumbers.filter(n => (newMap[n] || 'available') === 'available');
+                 const digits = allTicketNumbers[0].length;
+                 onDataLoaded(available, digits);
+              }
+              
+              return newMap;
+            });
           }
         }
       )
@@ -163,7 +183,7 @@ export default function NumberGrid({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [raffle_id]);
+  }, [raffle_id, allTicketNumbers, onDataLoaded]);
 
   const handleTicketClick = (ticketNumber: string, status: TicketStatus | undefined) => {
     if (status && status !== 'available') return;

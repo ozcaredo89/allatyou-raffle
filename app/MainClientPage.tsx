@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import NumberGrid from './components/raffle/NumberGrid';
 import CheckoutModal from './components/raffle/CheckoutModal';
+import LuckySlot from './components/raffle/LuckySlot';
 
 interface MainClientPageProps {
   raffleId: string;
@@ -23,6 +24,13 @@ export default function MainClientPage({
 }: MainClientPageProps) {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [availableTickets, setAvailableTickets] = useState<string[]>([]);
+  const [ticketDigits, setTicketDigits] = useState<number>(0);
+
+  const handleDataLoaded = (tickets: string[], digits: number) => {
+    setAvailableTickets(tickets);
+    setTicketDigits(digits);
+  };
 
   const handleTicketSelect = (ticket: string) => {
     setSelectedTickets(prev => {
@@ -87,6 +95,23 @@ export default function MainClientPage({
 
       {/* Main Grid Area */}
       <main className="relative mx-auto w-full max-w-4xl px-4 py-8 md:py-12 z-10 mb-20">
+        
+        {/* Lucky Slot Machine Area */}
+        {ticketDigits > 0 && availableTickets.length > 0 && (
+          <div className="mb-12 animate-[fadeIn_0.5s_ease-out]">
+            <LuckySlot 
+              availableTickets={availableTickets} 
+              ticketDigits={ticketDigits} 
+              onTicketSelect={(ticket) => {
+                if (!selectedTickets.includes(ticket)) {
+                   handleTicketSelect(ticket);
+                }
+                setIsCheckoutOpen(true);
+              }} 
+            />
+          </div>
+        )}
+
         <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 md:p-8 backdrop-blur-sm shadow-2xl shadow-black/50">
           <NumberGrid
             raffle_id={raffleId}
@@ -94,6 +119,7 @@ export default function MainClientPage({
             end_ticket={endTicket}
             selectedTickets={selectedTickets}
             onTicketSelect={handleTicketSelect}
+            onDataLoaded={handleDataLoaded}
           />
         </div>
       </main>
