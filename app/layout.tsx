@@ -31,7 +31,7 @@ export default function RootLayout({
 
         {/* Global WhatsApp Support Button */}
         <a
-          href="https://wa.me/573147369247?text=Me%20siento%20con%20suerte%20vendeme%20una%20rifa%20que%20me%20la%20voy%20a%20ganar"
+          href="https://wa.me/573147369247?text=Quiero%20comprar%20la%20rifa"
           target="_blank"
           rel="noopener noreferrer"
           className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-transform hover:scale-110 md:h-auto md:w-auto md:px-6 md:py-3 md:rounded-xl"
