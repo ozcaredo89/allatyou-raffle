@@ -35,8 +35,8 @@ export default function MainClientPage({
   const handleTicketSelect = (ticket: string) => {
     setSelectedTickets(prev => {
       if (prev.includes(ticket)) return prev.filter(t => t !== ticket);
-      if (prev.length >= 10) {
-        alert('Solo puedes seleccionar un máximo de 10 tickets a la vez.');
+      if (prev.length >= 30) {
+        alert('Solo puedes seleccionar un máximo de 30 tickets a la vez.');
         return prev;
       }
       return [...prev, ticket];
