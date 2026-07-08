@@ -81,9 +81,29 @@ export default function TicketDownloadButton({
       // 3. Escribir Datos del Comprador
       ctx.fillStyle = TEXT_COLOR;
       
-      // Nombre
+      // Nombre (con Word Wrap)
       ctx.font = NAME_FONT;
-      ctx.fillText(buyerName, NAME_POS_X, NAME_POS_Y);
+      const MAX_TEXT_WIDTH = 480; // QR comienza en 650, Nombre empieza en 150. Max width ~ 480.
+      const LINE_HEIGHT = 45; // Separación para fuente de 36px
+
+      const words = buyerName.split(' ');
+      let currentLine = '';
+      let currentY = NAME_POS_Y;
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > MAX_TEXT_WIDTH && i > 0) {
+          ctx.fillText(currentLine, NAME_POS_X, currentY);
+          currentLine = words[i] + ' ';
+          currentY += LINE_HEIGHT;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      // Dibujar la última línea
+      ctx.fillText(currentLine, NAME_POS_X, currentY);
 
       // Fecha
       ctx.font = DATE_FONT;

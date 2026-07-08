@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import TicketDownloadButton from '@/app/components/raffle/TicketDownloadButton';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -363,6 +364,21 @@ export default function CheckoutModal({
               <p className="text-sm text-zinc-400 max-w-[250px]">
                 Los tickets <strong className="text-emerald-400">#{ticketNumbers.join(', ')}</strong> han entrado a validación. Te confirmaremos por WhatsApp.
               </p>
+
+              <div className="w-full flex flex-col gap-3 mt-4">
+                {ticketNumbers.map(ticketNumber => (
+                  <TicketDownloadButton 
+                    key={ticketNumber}
+                    raffleId={raffleId}
+                    ticketNumber={ticketNumber}
+                    buyerName={name}
+                    purchaseDate={new Date().toLocaleDateString()}
+                    status="paid" 
+                    variant="small"
+                  />
+                ))}
+              </div>
+
               <button
                 onClick={handleSuccessClose}
                 className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white shadow-md transition-colors hover:bg-white/10 active:scale-[0.98]"
