@@ -83,8 +83,8 @@ export default function TicketDownloadButton({
       
       // Nombre (con Word Wrap)
       ctx.font = NAME_FONT;
-      const MAX_TEXT_WIDTH = 480; // QR comienza en 650, Nombre empieza en 150. Max width ~ 480.
-      const LINE_HEIGHT = 45; // Separación para fuente de 36px
+      const MAX_TEXT_WIDTH = 820; // El espacio real antes del QR
+      const LINE_HEIGHT = 90; // Separación para la fuente de 80px
 
       const words = buyerName.split(' ');
       let currentLine = '';
