@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import TicketDownloadButton from '@/app/components/raffle/TicketDownloadButton';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -278,6 +279,16 @@ export default function ValidationPanelPage({
                              >
                                ✕ Liberar
                              </button>
+                           )}
+                           {ticket.status === 'paid' && ticket.customer && (
+                             <TicketDownloadButton 
+                               variant="small"
+                               raffleId={raffle_id}
+                               ticketNumber={ticket.ticket_number}
+                               buyerName={ticket.customer.name}
+                               purchaseDate={ticket.reserved_at ? new Date(ticket.reserved_at).toLocaleDateString() : new Date().toLocaleDateString()}
+                               status={ticket.status}
+                             />
                            )}
                          </div>
                        </td>
