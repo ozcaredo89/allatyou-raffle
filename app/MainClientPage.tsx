@@ -88,7 +88,7 @@ export default function MainClientPage({
         <div className="relative group cursor-default">
           <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 opacity-30 group-hover:opacity-50 blur transition duration-500"></div>
           <div className="relative inline-flex items-center rounded-full bg-[#111823] border border-white/10 px-6 py-2.5 text-sm md:text-base font-bold text-emerald-300 shadow-2xl">
-            <span className="mr-2 text-lg">💎</span> Valor del Ticket: {formatPrice(price)}
+            <span className="mr-2 text-lg">💎</span> Valor de la Boleta: {formatPrice(price)}
           </div>
         </div>
       </header>
