@@ -24,3 +24,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ocultar el botón de WhatsApp cuando se activa por JavaScript */
+body.hide-whatsapp #whatsapp-button {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: scale(0.8) translateY(20px);
+}

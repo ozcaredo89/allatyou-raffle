@@ -31,10 +31,11 @@ export default function RootLayout({
 
         {/* Global WhatsApp Support Button */}
         <a
+          id="whatsapp-button"
           href="https://wa.me/573147369247?text=Quiero%20comprar%20la%20rifa"
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-transform hover:scale-110 md:h-auto md:w-auto md:px-6 md:py-3 md:rounded-xl"
+          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all duration-300 hover:scale-110 md:h-auto md:w-auto md:px-6 md:py-3 md:rounded-xl"
           aria-label="Atención al cliente por WhatsApp"
         >
           <svg className="h-7 w-7 md:mr-2 md:h-5 md:w-5" fill="currentColor" viewBox="0 0 24 24">
