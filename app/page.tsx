@@ -33,7 +33,14 @@ export default async function Page() {
   }
 
   const hero = activeRaffles[0];
-  const otherRaffles = activeRaffles.slice(1).map(r => ({ id: r.id, name: r.name, slug: r.slug }));
+  const allRaffles = activeRaffles.map(r => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    price_per_ticket: r.price_per_ticket,
+    cover_image_url: r.cover_image_url,
+    is_featured: r.is_featured,
+  }));
 
   return (
     <MainClientPage
@@ -44,7 +51,7 @@ export default async function Page() {
       startTicket={hero.start_ticket}
       endTicket={hero.end_ticket}
       coverImageUrl={hero.cover_image_url ?? undefined}
-      otherRaffles={otherRaffles.length > 0 ? otherRaffles : undefined}
+      allRaffles={allRaffles}
     />
   );
 }

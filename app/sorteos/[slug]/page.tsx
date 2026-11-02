@@ -41,6 +41,22 @@ export default async function SorteoPage({ params }: { params: Promise<{ slug: s
     );
   }
 
+  const { data: activeRaffles } = await supabase
+    .from('rafle_raffles')
+    .select('id, name, price_per_ticket, slug, cover_image_url, is_featured')
+    .eq('status', 'active')
+    .order('is_featured', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const allRaffles = activeRaffles?.map(r => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    price_per_ticket: r.price_per_ticket,
+    cover_image_url: r.cover_image_url,
+    is_featured: r.is_featured,
+  }));
+
   return (
     <MainClientPage
       raffleId={raffle.id}
@@ -50,6 +66,7 @@ export default async function SorteoPage({ params }: { params: Promise<{ slug: s
       startTicket={raffle.start_ticket}
       endTicket={raffle.end_ticket}
       coverImageUrl={raffle.cover_image_url ?? undefined}
+      allRaffles={allRaffles}
     />
   );
 }

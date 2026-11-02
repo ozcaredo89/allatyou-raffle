@@ -22,9 +22,18 @@ export default async function SorteosPage() {
   return (
     <div className="min-h-screen bg-[#0a0f16] font-sans text-white p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-xs md:text-sm font-bold text-zinc-300 hover:bg-white/10 hover:text-white transition-all"
+          >
+            <span>←</span>
+            <span>Volver al sorteo principal</span>
+          </Link>
+        </div>
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-black tracking-tight mb-2">Sorteos Activos</h1>
-          <p className="text-zinc-400">Elige tu sorteo y participa por increibles premios.</p>
+          <p className="text-zinc-400">Elige tu sorteo y participa por increíbles premios.</p>
         </div>
 
         {!raffles || raffles.length === 0 ? (
@@ -56,8 +65,8 @@ export default async function SorteosPage() {
                     <p className="text-zinc-400 text-xs line-clamp-2 mb-3">{raffle.description}</p>
                   )}
                   <div className="flex justify-between items-center">
-                    <span className="text-emerald-400 font-bold text-sm">{formatPrice(raffle.price_per_ticket)} / ticket</span>
-                    <span className="text-xs text-blue-400 font-bold group-hover:underline">Ver sorteo</span>
+                    <span className="text-emerald-400 font-bold text-sm">{formatPrice(raffle.price_per_ticket)} / boleta</span>
+                    <span className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-300 font-bold group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors">Participar →</span>
                   </div>
                 </div>
               </Link>

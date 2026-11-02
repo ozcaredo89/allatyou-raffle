@@ -1,9 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import NumberGrid from './components/raffle/NumberGrid';
 import CheckoutModal from './components/raffle/CheckoutModal';
 import LuckySlot from './components/raffle/LuckySlot';
+
+export interface ActiveRaffleSummary {
+  id: string;
+  name: string;
+  slug: string | null;
+  price_per_ticket: number;
+  cover_image_url?: string | null;
+  is_featured?: boolean | null;
+}
 
 interface MainClientPageProps {
   raffleId: string;
@@ -12,12 +22,8 @@ interface MainClientPageProps {
   price: number;
   startTicket?: number | null;
   endTicket?: number | null;
-  coverImageUrl?: string;          // NEW
-  otherRaffles?: {                 // NEW
-    id: string;
-    name: string;
-    slug: string | null;
-  }[];
+  coverImageUrl?: string;
+  allRaffles?: ActiveRaffleSummary[];
 }
 
 export default function MainClientPage({
@@ -28,7 +34,7 @@ export default function MainClientPage({
   startTicket,
   endTicket,
   coverImageUrl,
-  otherRaffles,
+  allRaffles,
 }: MainClientPageProps) {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -78,15 +84,57 @@ export default function MainClientPage({
     }).format(amount);
   };
 
+  const hasMultipleRaffles = Boolean(allRaffles && allRaffles.length > 1);
+  const otherRaffles = allRaffles?.filter(r => r.id !== raffleId) ?? [];
+
   return (
-    <div className="min-h-screen bg-[#0a0f16] font-sans selection:bg-emerald-500/30 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#0a0f16] font-sans selection:bg-emerald-500/30 text-white relative overflow-x-hidden">
       
       {/* Background ambient glows */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-900/20 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-900/20 blur-[120px] pointer-events-none" />
 
+      {/* Top Sticky Navigation Bar when multiple raffles are active */}
+      {hasMultipleRaffles && allRaffles && (
+        <nav className="sticky top-0 z-40 w-full border-b border-emerald-500/20 bg-[#0a0f16]/90 backdrop-blur-xl px-3 py-2.5 shadow-[0_4px_25px_rgba(0,0,0,0.6)]">
+          <div className="mx-auto max-w-5xl flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full shrink-0">
+                🔥 {allRaffles.length} Sorteos
+              </span>
+              {allRaffles.map((r) => {
+                const isCurrent = r.id === raffleId;
+                const href = `/sorteos/${r.slug ?? r.id}`;
+                return (
+                  <Link
+                    key={r.id}
+                    href={href}
+                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs md:text-sm font-bold transition-all shrink-0 ${
+                      isCurrent
+                        ? 'bg-emerald-500/20 border border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                        : 'bg-white/5 border border-white/15 text-zinc-200 hover:bg-white/15 hover:border-white/30 hover:text-white'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+                    <span>{r.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <Link
+              href="/sorteos"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-xs font-bold text-indigo-300 hover:bg-indigo-500/25 hover:text-white transition-all shrink-0"
+            >
+              <span>Ver catálogo</span>
+              <span>→</span>
+            </Link>
+          </div>
+        </nav>
+      )}
+
       {/* Header Premium Casino Style */}
-      <header className="sticky top-0 z-30 flex flex-col items-center justify-center border-b border-white/5 bg-[#0a0f16]/80 px-4 py-8 text-center backdrop-blur-xl supports-[backdrop-filter]:bg-[#0a0f16]/60">
+      <header className="relative z-20 flex flex-col items-center justify-center border-b border-white/5 bg-[#0a0f16]/80 px-4 py-8 text-center backdrop-blur-xl supports-[backdrop-filter]:bg-[#0a0f16]/60">
         <div className="inline-flex items-center gap-2 mb-3">
           <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-emerald-500/50"></span>
           <span className="text-xs font-bold tracking-widest text-emerald-400 uppercase">Sorteo Activo</span>
@@ -105,30 +153,14 @@ export default function MainClientPage({
 
         {/* Cover image */}
         {coverImageUrl && (
-          <div className="w-full max-w-sm mx-auto mb-4 rounded-xl overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+          <div className="w-full max-w-sm mx-auto mb-5 rounded-xl overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverImageUrl} alt={raffleName} className="w-full h-44 object-cover" />
-          </div>
-        )}
-
-        {/* Other raffles chips */}
-        {otherRaffles && otherRaffles.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-center mb-2">
-            <span className="text-xs text-zinc-500 self-center">También en juego:</span>
-            {otherRaffles.map(r => (
-              <a
-                key={r.id}
-                href={`/sorteos/${r.slug ?? r.id}`}
-                className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs font-bold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                {r.name}
-              </a>
-            ))}
+            <img src={coverImageUrl} alt={raffleName} className="w-full h-48 object-cover" />
           </div>
         )}
 
         {/* Social Links */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-7">
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
           <a href="https://www.instagram.com/jersonfranco_?igsh=a3RsamZqcHVtMG9y&utm_source=qr" target="_blank" rel="noopener noreferrer" 
              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/30 px-4 py-2 text-sm font-bold text-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.15)] hover:from-pink-500 hover:to-purple-600 hover:text-white transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)]" aria-label="Instagram">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -151,6 +183,53 @@ export default function MainClientPage({
             <span className="mr-2 text-lg">💎</span> Valor de la Boleta: {formatPrice(price)}
           </div>
         </div>
+
+        {/* High-visibility Other Active Raffles Selector Cards */}
+        {otherRaffles.length > 0 && (
+          <div className="w-full max-w-2xl mt-7 pt-6 border-t border-white/10">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="text-xs md:text-sm font-extrabold uppercase tracking-wider text-amber-300">
+                🔥 Otros sorteos disponibles en este momento
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+              {otherRaffles.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/sorteos/${r.slug ?? r.id}`}
+                  className="group flex items-center justify-between gap-3 p-3 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-[#131c29] to-emerald-500/10 hover:border-emerald-400 hover:shadow-[0_0_25px_rgba(16,185,129,0.25)] transition-all hover:scale-[1.01]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {r.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.cover_image_url}
+                        alt={r.name}
+                        className="w-12 h-12 rounded-xl object-cover border border-white/15 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xl shrink-0">
+                        🎫
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm md:text-base font-black text-white truncate group-hover:text-emerald-300 transition-colors">
+                        {r.name}
+                      </p>
+                      <p className="text-xs font-bold text-emerald-400">
+                        Boleta: {formatPrice(r.price_per_ticket)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1.5 rounded-xl bg-emerald-500 text-xs font-black text-slate-950 group-hover:bg-emerald-400 transition-colors shrink-0 shadow-md">
+                    Ver sorteo →
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Dynamic Inline WhatsApp Button */}
         <div className={`transition-all duration-500 flex justify-center ${selectedTickets.length > 0 ? 'opacity-100 max-h-20 mt-6' : 'opacity-0 max-h-0 overflow-hidden'}`}>
