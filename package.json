@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-secrets.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check-secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",
