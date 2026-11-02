@@ -127,14 +127,14 @@ export default function CheckoutModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-0">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-[#0f151f] shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-white/10 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden rounded-2xl bg-[#0f151f] shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-white/10 relative">
 
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-emerald-500/10 blur-[50px] pointer-events-none" />
 
         {/* Header Modal */}
-        <div className="relative border-b border-white/5 bg-[#141b26] px-6 py-5">
+        <div className="relative border-b border-white/5 bg-[#141b26] px-6 py-5 shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
               <span className="text-emerald-400">#</span>
@@ -153,7 +153,7 @@ export default function CheckoutModal({
         </div>
 
         {/* Cuerpos del Modal */}
-        <div className="p-6 relative">
+        <div className="p-6 relative overflow-y-auto">
           {error && (
             <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm font-medium text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
               {error}
@@ -354,18 +354,18 @@ export default function CheckoutModal({
 
           {/* PASO 3: Éxito */}
           {step === 3 && (
-            <div className="flex flex-col items-center gap-4 py-6 text-center">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_30px_rgba(52,211,153,0.3)]">
-                <span className="text-5xl drop-shadow-md">💎</span>
+            <div className="flex flex-col items-center gap-4 py-2 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_30px_rgba(52,211,153,0.3)]">
+                <span className="text-3xl drop-shadow-md">💎</span>
               </div>
-              <h3 className="text-2xl font-black text-white mt-2 tracking-tight">
+              <h3 className="text-2xl font-black text-white tracking-tight">
                 ¡Tickets Asegurados!
               </h3>
-              <p className="text-sm text-zinc-400 max-w-[250px]">
-                Los tickets <strong className="text-emerald-400">#{ticketNumbers.join(', ')}</strong> han entrado a validación. Te confirmaremos por WhatsApp.
+              <p className="text-xs text-zinc-400 max-w-xs">
+                Los tickets <strong className="text-emerald-400">#{ticketNumbers.join(', ')}</strong> han entrado a validación. Aquí tienes la vista previa de tu boleta:
               </p>
 
-              <div className="w-full flex flex-col gap-3 mt-4">
+              <div className="w-full flex flex-col gap-4 mt-2">
                 {ticketNumbers.map(ticketNumber => (
                   <TicketDownloadButton 
                     key={ticketNumber}
@@ -374,14 +374,14 @@ export default function CheckoutModal({
                     buyerName={name}
                     purchaseDate={new Date().toLocaleDateString()}
                     status="paid" 
-                    variant="small"
+                    showPreview={true}
                   />
                 ))}
               </div>
 
               <button
                 onClick={handleSuccessClose}
-                className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white shadow-md transition-colors hover:bg-white/10 active:scale-[0.98]"
+                className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-white/10 active:scale-[0.98]"
               >
                 Volver al Sorteo
               </button>

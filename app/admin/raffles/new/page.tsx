@@ -31,6 +31,12 @@ export default function AdminNewRafflePage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
+  // Ticket template fields
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [templatePreview, setTemplatePreview] = useState<string | null>(null);
+  const [templateMode, setTemplateMode] = useState<'final' | 'reference'>('final');
+  const [sendTemplateEmail, setSendTemplateEmail] = useState<boolean>(true);
+
   // Auto-generate slug from name
   useEffect(() => {
     if (!slugManuallyEdited) {
@@ -60,6 +66,17 @@ export default function AdminNewRafflePage() {
       setCoverPreview(url);
     } else {
       setCoverPreview(null);
+    }
+  };
+
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setTemplateFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setTemplatePreview(url);
+    } else {
+      setTemplatePreview(null);
     }
   };
 
@@ -139,7 +156,37 @@ export default function AdminNewRafflePage() {
         }
       }
 
-      setSuccess(`Sorteo creado con exito! Todos los numeros han sido generados. ID: ${raffle_id}`);
+      // Step 4: Upload ticket template or reference image if selected
+      let templateStatusNote = '';
+      if (templateFile && raffle_id) {
+        const templateForm = new FormData();
+        templateForm.append('raffle_id', raffle_id);
+        templateForm.append('file', templateFile);
+        const isFinal = templateMode === 'final';
+        const shouldEmail = templateMode === 'reference' || sendTemplateEmail;
+        templateForm.append('is_final_template', String(isFinal));
+        templateForm.append('send_email', String(shouldEmail));
+
+        const templateRes = await fetch('/api/raffles/upload-template', {
+          method: 'POST',
+          body: templateForm,
+        });
+
+        if (templateRes.ok) {
+          const tplData = await templateRes.json();
+          if (tplData.applied && tplData.emailed) {
+            templateStatusNote = ' Plantilla de boleta activada y enviada al correo.';
+          } else if (tplData.applied) {
+            templateStatusNote = ' Plantilla de boleta activada para este sorteo.';
+          } else if (tplData.emailed) {
+            templateStatusNote = ' Imagen enviada al correo para diseñar la plantilla.';
+          }
+        } else {
+          console.warn('Ticket template upload failed.');
+        }
+      }
+
+      setSuccess(`Sorteo creado con exito! Todos los numeros han sido generados.${templateStatusNote} ID: ${raffle_id}`);
       
       // Reset form on success
       setName('');
@@ -154,6 +201,10 @@ export default function AdminNewRafflePage() {
       setIsFeatured(false);
       setCoverFile(null);
       setCoverPreview(null);
+      setTemplateFile(null);
+      setTemplatePreview(null);
+      setTemplateMode('final');
+      setSendTemplateEmail(true);
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -294,6 +345,134 @@ export default function AdminNewRafflePage() {
               <p className="text-xs text-zinc-500 mt-1">
                 Archivo: <span className="text-blue-400">{coverFile.name}</span>
               </p>
+            )}
+          </div>
+
+          {/* Ticket Template Image */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-4 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <label className="block text-sm font-bold text-emerald-300">
+                  🎟️ Plantilla / Imagen para la Boleta (Opcional)
+                </label>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Sube la plantilla vertical (1536×2752 px) o sube una imagen base para que te llegue al correo y acomodarla en el template.
+                </p>
+              </div>
+              <a
+                href="/ticket-template.png"
+                download="plantilla-referencia-1536x2752.png"
+                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2 shrink-0"
+              >
+                📥 Descargar base de referencia
+              </a>
+            </div>
+
+            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-emerald-500/25 rounded-xl cursor-pointer hover:border-emerald-500/60 transition-colors bg-[#0a0f16] overflow-hidden">
+              {templatePreview ? (
+                <div className="relative w-full h-full flex items-center justify-center bg-black/40 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={templatePreview}
+                    alt="Ticket template preview"
+                    className="max-h-full w-auto object-contain rounded"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-zinc-400 px-4 text-center">
+                  <span className="text-3xl">🎟️</span>
+                  <span className="text-xs font-bold text-emerald-400">
+                    Click para subir la plantilla o imagen para la boleta
+                  </span>
+                  <span className="text-[11px] text-zinc-500">
+                    Formato recomendado: 9:16 vertical (1536 × 2752 px)
+                  </span>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleTemplateChange}
+                disabled={isLoading}
+              />
+            </label>
+
+            {templateFile && (
+              <div className="flex flex-col gap-2.5 pt-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span className="truncate">
+                    Archivo: <strong className="text-emerald-400">{templateFile.name}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateFile(null);
+                      setTemplatePreview(null);
+                    }}
+                    className="text-red-400 hover:text-red-300 font-bold ml-2 shrink-0"
+                  >
+                    Quitar
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-xs cursor-pointer transition-all ${
+                      templateMode === 'final'
+                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200'
+                        : 'border-white/10 bg-[#0a0f16] text-zinc-400 hover:bg-white/5'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="templateMode"
+                      className="mt-0.5 accent-emerald-500"
+                      checked={templateMode === 'final'}
+                      onChange={() => setTemplateMode('final')}
+                    />
+                    <div>
+                      <p className="font-bold">Ya es la plantilla lista</p>
+                      <p className="text-[11px] opacity-80">Usar de inmediato en las boletas de este sorteo</p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-xs cursor-pointer transition-all ${
+                      templateMode === 'reference'
+                        ? 'border-blue-500/50 bg-blue-500/15 text-blue-200'
+                        : 'border-white/10 bg-[#0a0f16] text-zinc-400 hover:bg-white/5'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="templateMode"
+                      className="mt-0.5 accent-blue-500"
+                      checked={templateMode === 'reference'}
+                      onChange={() => {
+                        setTemplateMode('reference');
+                        setSendTemplateEmail(true);
+                      }}
+                    />
+                    <div>
+                      <p className="font-bold">Enviarme al correo para armarla</p>
+                      <p className="text-[11px] opacity-80">La acomodo en el template y la subo luego</p>
+                    </div>
+                  </label>
+                </div>
+
+                {templateMode === 'final' && (
+                  <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer select-none pt-1">
+                    <input
+                      type="checkbox"
+                      checked={sendTemplateEmail}
+                      onChange={(e) => setSendTemplateEmail(e.target.checked)}
+                      className="rounded accent-emerald-500"
+                    />
+                    <span>Enviarme también una copia de esta imagen al correo del administrador</span>
+                  </label>
+                )}
+              </div>
             )}
           </div>
 

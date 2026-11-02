@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import QRCode from 'qrcode';
 
 interface TicketDownloadButtonProps {
@@ -10,11 +10,13 @@ interface TicketDownloadButtonProps {
   purchaseDate: string;
   status: string; // 'available', 'reserved', 'pending', 'paid'
   variant?: 'default' | 'small';
+  showPreview?: boolean;
+  templateUrlOverride?: string | null;
 }
 
 // -------------------------------------------------------------
 // CONSTANTES DE DIBUJO (AJÚSTALAS SEGÚN TU DISEÑO)
-// Basado en plantilla vertical 9:16 (Ej. 1080 x 1920 px)
+// Basado en plantilla vertical 9:16 (1536 x 2752 px)
 // -------------------------------------------------------------
 const TEMPLATE_WIDTH = 1536;
 const TEMPLATE_HEIGHT = 2752;
@@ -33,11 +35,21 @@ const QR_POS_Y = 2220; // Ajusta para ubicar el QR en el recuadro blanco
 const QR_SIZE = 410; // Tamaño del QR (ancho y alto)
 
 // ESTILOS DE TEXTO
-const NAME_FONT = 'bold 80px Arial, sans-serif'; 
+const NAME_FONT = 'bold 80px Arial, sans-serif';
 const DATE_FONT = 'bold 45px Arial, sans-serif';
 const TICKET_FONT = 'bold 70px "Courier New", Courier, monospace';
 const TEXT_COLOR = '#0f151f';
 // -------------------------------------------------------------
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
 
 export default function TicketDownloadButton({
   raffleId,
@@ -46,14 +58,20 @@ export default function TicketDownloadButton({
   purchaseDate,
   status,
   variant = 'default',
+  showPreview,
+  templateUrlOverride,
 }: TicketDownloadButtonProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   const isPaid = status === 'paid';
+  const inlinePreview = showPreview ?? variant === 'default';
 
-  const handleDownload = async () => {
-    if (!isPaid || !canvasRef.current) return;
+  const generateTicketDataUrl = useCallback(async (): Promise<string | null> => {
+    if (!isPaid || !canvasRef.current) return null;
 
     setIsGenerating(true);
 
@@ -62,38 +80,43 @@ export default function TicketDownloadButton({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('No 2D context');
 
-      // 1. Cargar la imagen de la plantilla
-      const image = new Image();
-      image.src = '/ticket-template.png'; // Asegúrate de tener este archivo en la carpeta 'public'
-      
-      await new Promise((resolve, reject) => {
-        image.onload = resolve;
-        image.onerror = reject;
-      });
+      // 1. Cargar la imagen de la plantilla específica de este sorteo
+      const primarySrc =
+        templateUrlOverride ||
+        `/api/raffles/${encodeURIComponent(raffleId)}/ticket-template`;
 
-      // Asegurar proporciones correctas en el canvas (basado en la plantilla)
-      canvas.width = image.width || TEMPLATE_WIDTH;
-      canvas.height = image.height || TEMPLATE_HEIGHT;
+      let image: HTMLImageElement;
+      try {
+        image = await loadImage(primarySrc);
+      } catch {
+        image = await loadImage('/ticket-template.png');
+      }
+
+      // Siempre usar el espacio de coordenadas estándar (1536 x 2752)
+      // para que los textos y el QR queden exactamente en su sitio
+      canvas.width = TEMPLATE_WIDTH;
+      canvas.height = TEMPLATE_HEIGHT;
 
       // 2. Dibujar la imagen base
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, TEMPLATE_WIDTH, TEMPLATE_HEIGHT);
 
       // 3. Escribir Datos del Comprador
       ctx.fillStyle = TEXT_COLOR;
-      
+
       // Nombre (con Word Wrap)
       ctx.font = NAME_FONT;
       const MAX_TEXT_WIDTH = 820; // El espacio real antes del QR
       const LINE_HEIGHT = 90; // Separación para la fuente de 80px
 
-      const words = buyerName.split(' ');
+      const safeBuyerName = (buyerName || 'Cliente').trim();
+      const words = safeBuyerName.split(' ');
       let currentLine = '';
       let currentY = NAME_POS_Y;
 
       for (let i = 0; i < words.length; i++) {
         const testLine = currentLine + words[i] + ' ';
         const metrics = ctx.measureText(testLine);
-        
+
         if (metrics.width > MAX_TEXT_WIDTH && i > 0) {
           ctx.fillText(currentLine, NAME_POS_X, currentY);
           currentLine = words[i] + ' ';
@@ -115,36 +138,57 @@ export default function TicketDownloadButton({
 
       // 4. Generar el QR
       const verifyUrl = `${window.location.origin}/verify?ticket=${encodeURIComponent(ticketNumber)}&raffle=${encodeURIComponent(raffleId)}`;
-      
-      // Creamos un canvas temporal para el QR
+
       const qrCanvas = document.createElement('canvas');
       await QRCode.toCanvas(qrCanvas, verifyUrl, {
         width: QR_SIZE,
-        margin: 1, // Borde mínimo
+        margin: 1,
         color: {
-          dark: '#000000', // Código QR negro
-          light: '#ffffff' // Fondo del QR blanco
-        }
+          dark: '#000000',
+          light: '#ffffff',
+        },
       });
 
       // Dibujar el QR en nuestro canvas principal
       ctx.drawImage(qrCanvas, QR_POS_X, QR_POS_Y, QR_SIZE, QR_SIZE);
 
-      // 5. Trigger Download
       const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `Boleta_Sorteo_${ticketNumber}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      setPreviewDataUrl(dataUrl);
+      return dataUrl;
     } catch (err) {
       console.error('Error generando el ticket:', err);
-      alert('Hubo un error al generar la boleta. Inténtalo de nuevo.');
+      return null;
     } finally {
       setIsGenerating(false);
     }
+  }, [isPaid, raffleId, ticketNumber, buyerName, purchaseDate, templateUrlOverride]);
+
+  // Generar automáticamente la vista previa cuando está en modo inlinePreview o se abre el modal
+  useEffect(() => {
+    if (isPaid && (inlinePreview || isModalOpen)) {
+      generateTicketDataUrl();
+    }
+  }, [isPaid, inlinePreview, isModalOpen, generateTicketDataUrl]);
+
+  const handleDownload = async () => {
+    if (!isPaid) return;
+
+    let dataUrl = previewDataUrl;
+    if (!dataUrl) {
+      dataUrl = await generateTicketDataUrl();
+    }
+
+    if (!dataUrl) {
+      alert('Hubo un error al generar la boleta. Inténtalo de nuevo.');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `Boleta_Sorteo_${ticketNumber}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (!isPaid) {
@@ -157,26 +201,194 @@ export default function TicketDownloadButton({
     );
   }
 
+  // MODO 1: Vista previa inline (Checkout Paso 3 o vista principal)
+  if (inlinePreview) {
+    return (
+      <div className="flex flex-col items-center gap-3 w-full">
+        {/* Canvas Oculto para la composición */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Tarjeta de Vista Previa */}
+        <div className="w-full rounded-2xl border border-emerald-500/25 bg-[#0a0f16] p-3 shadow-[0_0_25px_rgba(16,185,129,0.12)]">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <span>🎟️</span> Boleta #{ticketNumber}
+            </span>
+            {previewDataUrl && (
+              <button
+                type="button"
+                onClick={() => setIsZoomOpen(true)}
+                className="text-[11px] font-bold text-zinc-400 hover:text-white transition-colors flex items-center gap-1"
+              >
+                <span>🔍</span> Ampliar
+              </button>
+            )}
+          </div>
+
+          {isGenerating && !previewDataUrl ? (
+            <div className="w-full aspect-[9/16] max-h-72 mx-auto rounded-xl bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-3 animate-pulse">
+              <div className="h-8 w-8 rounded-full border-t-2 border-emerald-400 animate-spin" />
+              <span className="text-xs font-bold text-zinc-400">
+                Generando vista previa de tu boleta...
+              </span>
+            </div>
+          ) : previewDataUrl ? (
+            <div
+              onClick={() => setIsZoomOpen(true)}
+              className="relative mx-auto overflow-hidden rounded-xl border border-white/10 bg-black/40 cursor-zoom-in group max-h-80 flex justify-center"
+              title="Haz clic para ver en tamaño completo"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewDataUrl}
+                alt={`Vista previa Boleta #${ticketNumber}`}
+                className="max-h-80 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+              />
+              <div className="absolute bottom-2 right-2 rounded-full bg-black/75 border border-white/15 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm opacity-80 group-hover:opacity-100">
+                🔍 Toca para ampliar
+              </div>
+            </div>
+          ) : null}
+
+          {/* Botón de Descarga debajo del Preview */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isGenerating}
+            className="mt-3 group relative inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 px-5 py-3.5 font-black text-sm text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-[1.01] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] disabled:scale-100 disabled:opacity-70 disabled:cursor-wait"
+          >
+            <span className="text-lg drop-shadow-md">⬇️</span>
+            <span className="relative z-10">
+              {isGenerating ? 'Generando...' : `Descargar Boleta #${ticketNumber}`}
+            </span>
+          </button>
+        </div>
+
+        {/* Lightbox para ver en grande */}
+        {isZoomOpen && previewDataUrl && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+            onClick={() => setIsZoomOpen(false)}
+          >
+            <div
+              className="relative max-h-[92vh] max-w-md w-full flex flex-col items-center gap-3 rounded-2xl bg-[#0f151f] border border-white/15 p-4 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex w-full items-center justify-between border-b border-white/10 pb-2.5">
+                <span className="text-sm font-black text-white flex items-center gap-2">
+                  <span className="text-emerald-400">🎟️</span> Vista Previa Boleta #{ticketNumber}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsZoomOpen(false)}
+                  className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="overflow-y-auto max-h-[72vh] w-full flex justify-center rounded-xl bg-black/50 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewDataUrl}
+                  alt={`Boleta #${ticketNumber}`}
+                  className="max-h-[68vh] w-auto object-contain rounded-lg"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 py-3.5 text-sm font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:opacity-95"
+              >
+                <span>⬇️</span> Descargar Boleta #{ticketNumber}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // MODO 2: Botón pequeño (ej. Tabla de Admin) -> Abre Modal de Vista Previa con botón Descargar
   return (
     <>
-      {/* Canvas Oculto para la composición */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Botón Principal */}
       <button
-        onClick={handleDownload}
+        type="button"
+        onClick={() => setIsModalOpen(true)}
         disabled={isGenerating}
-        className={
-          variant === 'small'
-            ? "group relative inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 font-bold text-emerald-400 text-xs shadow-sm transition-all hover:bg-emerald-500 hover:text-white active:scale-95 disabled:opacity-50"
-            : "group relative inline-flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-4 font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98] disabled:scale-100 disabled:opacity-70 disabled:cursor-wait"
-        }
+        className="group relative inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 font-bold text-emerald-400 text-xs shadow-sm transition-all hover:bg-emerald-500 hover:text-white active:scale-95 disabled:opacity-50"
       >
-        {variant !== 'small' && <span className="text-2xl drop-shadow-md">🎟️</span>}
-        <span className="relative z-10">
-          {isGenerating ? 'Generando...' : variant === 'small' ? 'Descargar' : 'Descargar mi Boleta Oficial'}
-        </span>
+        <span>👁️</span>
+        <span>Ver / Descargar</span>
       </button>
+
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md text-left"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-[#0f151f] border border-white/15 p-5 shadow-[0_0_50px_rgba(0,0,0,0.85)] flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <span className="text-emerald-400">🎟️</span> Boleta #{ticketNumber}
+                </h3>
+                <p className="text-xs text-zinc-400">Titular: {buyerName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="w-full flex justify-center items-center bg-[#0a0f16] rounded-xl border border-white/10 p-2 min-h-[280px] max-h-[62vh] overflow-y-auto">
+              {isGenerating && !previewDataUrl ? (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  <div className="h-8 w-8 rounded-full border-t-2 border-emerald-400 animate-spin" />
+                  <span className="text-xs font-bold text-zinc-400">Generando vista previa...</span>
+                </div>
+              ) : previewDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewDataUrl}
+                  alt={`Vista previa Boleta #${ticketNumber}`}
+                  className="max-h-[58vh] w-auto object-contain rounded-lg"
+                />
+              ) : (
+                <span className="text-xs text-red-400">No se pudo generar la vista previa.</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-bold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isGenerating || !previewDataUrl}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-3 text-xs font-black text-white shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:opacity-95 disabled:opacity-50"
+              >
+                <span>⬇️</span>
+                <span>{isGenerating ? 'Generando...' : `Descargar Boleta #${ticketNumber}`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
