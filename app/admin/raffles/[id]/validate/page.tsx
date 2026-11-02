@@ -38,6 +38,8 @@ export default function ValidationPanelPage({
 
   const [notesState, setNotesState] = useState<Record<string, string>>({});
   const [editingCustomer, setEditingCustomer] = useState<{ticket_id: string; name: string; phone: string} | null>(null);
+  const [previewTicket, setPreviewTicket] = useState<ValidationTicket | null>(null);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -105,6 +107,17 @@ export default function ValidationPanelPage({
     fetchTickets();
   }, [raffle_id]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewTicket(null);
+        setIsZoomed(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleAction = async (ticket_id: string, action: 'approve' | 'reject') => {
     if (!window.confirm(`¿Seguro que deseas ${action === 'approve' ? 'APROBAR' : 'RECHAZAR'} este ticket?`)) {
       return;
@@ -123,6 +136,11 @@ export default function ValidationPanelPage({
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al procesar la acción.');
+
+      if (previewTicket?.id === ticket_id) {
+        setPreviewTicket(null);
+        setIsZoomed(false);
+      }
 
       // Refresh list
       fetchTickets();
@@ -218,7 +236,7 @@ export default function ValidationPanelPage({
                <tbody className="divide-y divide-white/5">
                  {filteredTickets.length === 0 ? (
                    <tr>
-                     <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 font-medium tracking-wide">
+                     <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 font-medium tracking-wide">
                        No hay tickets en este estado.
                      </td>
                    </tr>
@@ -246,9 +264,34 @@ export default function ValidationPanelPage({
                        </td>
                        <td className="px-6 py-4">
                          {ticket.payment_proof_url ? (
-                           <a href={ticket.payment_proof_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-bold text-xs transition-colors">
-                             <span className="text-base">📸</span> Ver Foto
-                           </a>
+                           <button
+                             type="button"
+                             onClick={() => {
+                               setPreviewTicket(ticket);
+                               setIsZoomed(false);
+                             }}
+                             className="group inline-flex items-center gap-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-1.5 pr-3 text-left transition-all hover:border-indigo-400/50 hover:bg-indigo-500/20 hover:shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+                           >
+                             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#0a0f16]">
+                               {/* eslint-disable-next-line @next/next/no-img-element */}
+                               <img
+                                 src={ticket.payment_proof_url}
+                                 alt={`Comprobante ticket ${ticket.ticket_number}`}
+                                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                               />
+                               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                                 <span className="text-sm">🔍</span>
+                               </div>
+                             </div>
+                             <div className="flex flex-col">
+                               <span className="text-xs font-bold text-indigo-300 group-hover:text-white transition-colors">
+                                 Ver Comprobante
+                               </span>
+                               <span className="text-[10px] text-indigo-400/70">
+                                 Clic para ampliar
+                               </span>
+                             </div>
+                           </button>
                          ) : (
                            <span className="text-zinc-600 text-xs italic">Sin adjunto</span>
                          )}
@@ -325,6 +368,195 @@ export default function ValidationPanelPage({
             </div>
           </div>
         )}
+
+        {/* Modal Visor de Comprobante (Lightbox de Auditoría) */}
+        {previewTicket && previewTicket.payment_proof_url && (() => {
+          const ticketsWithProof = filteredTickets.filter(t => Boolean(t.payment_proof_url));
+          const currentIndex = ticketsWithProof.findIndex(t => t.id === previewTicket.id);
+          const hasPrev = currentIndex > 0;
+          const hasNext = currentIndex >= 0 && currentIndex < ticketsWithProof.length - 1;
+
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 md:p-6"
+              onClick={() => {
+                setPreviewTicket(null);
+                setIsZoomed(false);
+              }}
+            >
+              <div
+                className="relative flex flex-col lg:flex-row w-full max-w-5xl max-h-[92vh] rounded-2xl bg-[#0f151f] border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Área de la Imagen */}
+                <div className="relative flex-1 bg-[#070b10] flex items-center justify-center overflow-auto min-h-[320px] max-h-[60vh] lg:max-h-[92vh] p-4 select-none">
+                  {/* Controles flotantes superiores sobre la imagen */}
+                  <div className="sticky top-2 left-2 z-20 self-start flex items-center gap-2 bg-[#0f151f]/90 backdrop-blur-md border border-white/10 rounded-xl p-1.5 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => setIsZoomed(z => !z)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-200 hover:bg-white/10 transition-colors flex items-center gap-1.5"
+                      title={isZoomed ? 'Ajustar a pantalla' : 'Hacer zoom'}
+                    >
+                      <span>{isZoomed ? '🔎' : '🔍'}</span>
+                      <span>{isZoomed ? 'Ajustar' : 'Zoom'}</span>
+                    </button>
+                    <a
+                      href={previewTicket.payment_proof_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-400 hover:bg-indigo-500/10 transition-colors flex items-center gap-1"
+                      title="Abrir archivo original en pestaña nueva"
+                    >
+                      <span>↗</span>
+                      <span>Original</span>
+                    </a>
+                  </div>
+
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewTicket.payment_proof_url}
+                    alt={`Comprobante ticket ${previewTicket.ticket_number}`}
+                    onClick={() => setIsZoomed(z => !z)}
+                    className={`rounded-lg transition-all duration-200 ${
+                      isZoomed
+                        ? 'max-w-none w-[140%] cursor-zoom-out'
+                        : 'max-h-[55vh] lg:max-h-[82vh] w-auto max-w-full object-contain cursor-zoom-in'
+                    }`}
+                  />
+                </div>
+
+                {/* Panel Lateral de Auditoría Rápida */}
+                <div className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 bg-[#0f151f] p-5 flex flex-col justify-between gap-4 overflow-y-auto">
+                  <div className="flex flex-col gap-4">
+                    {/* Header del panel */}
+                    <div className="flex items-start justify-between gap-2 border-b border-white/5 pb-4">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                          Auditoría de Ticket
+                        </span>
+                        <div className="flex items-center gap-2.5 mt-1">
+                          <span className="font-mono text-2xl font-black text-emerald-400">
+                            #{previewTicket.ticket_number}
+                          </span>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            previewTicket.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                            previewTicket.status === 'reserved' ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20' :
+                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {previewTicket.status === 'pending' ? 'Por Validar' : previewTicket.status === 'reserved' ? 'Reservado' : 'Pagado'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewTicket(null);
+                          setIsZoomed(false);
+                        }}
+                        className="rounded-lg border border-white/10 bg-white/5 p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                        aria-label="Cerrar vista previa"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Datos del Cliente */}
+                    <div className="rounded-xl bg-[#0a0f16] border border-white/5 p-3.5">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        Cliente
+                      </span>
+                      <p className="text-sm font-bold text-white mt-1">
+                        {previewTicket.customer?.name || 'Desconocido'}
+                      </p>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {previewTicket.customer?.phone || 'Sin WhatsApp'}
+                      </p>
+                      {previewTicket.reserved_at && (
+                        <p className="text-[11px] text-zinc-500 mt-2 border-t border-white/5 pt-2">
+                          Reservado: {new Date(previewTicket.reserved_at).toLocaleString('es-CO')}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Notas de Admin */}
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1.5">
+                        Notas de Auditoría
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={notesState[previewTicket.id] || ''}
+                        onChange={(e) => setNotesState(prev => ({ ...prev, [previewTicket.id]: e.target.value }))}
+                        placeholder="Escribe una observación..."
+                        className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/50 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Acciones de Auditoría y Navegación */}
+                  <div className="flex flex-col gap-3 pt-2 border-t border-white/5">
+                    <div className="flex gap-2">
+                      {previewTicket.status !== 'paid' && (
+                        <button
+                          type="button"
+                          onClick={() => handleAction(previewTicket.id, 'approve')}
+                          className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                        >
+                          ✓ Aprobar Pago
+                        </button>
+                      )}
+                      {previewTicket.status !== 'available' && (
+                        <button
+                          type="button"
+                          onClick={() => handleAction(previewTicket.id, 'reject')}
+                          className="flex-1 py-2.5 px-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white text-xs font-bold uppercase tracking-wider transition-all"
+                        >
+                          ✕ Liberar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Navegación entre comprobantes */}
+                    {ticketsWithProof.length > 1 && (
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={!hasPrev}
+                          onClick={() => {
+                            if (hasPrev) {
+                              setPreviewTicket(ticketsWithProof[currentIndex - 1]);
+                              setIsZoomed(false);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs font-bold text-zinc-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Anterior
+                        </button>
+                        <span className="text-[11px] font-bold text-zinc-500">
+                          {currentIndex + 1} de {ticketsWithProof.length}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={!hasNext}
+                          onClick={() => {
+                            if (hasNext) {
+                              setPreviewTicket(ticketsWithProof[currentIndex + 1]);
+                              setIsZoomed(false);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs font-bold text-zinc-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Siguiente →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>
