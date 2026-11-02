@@ -1,12 +1,7 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin as supabase } from '@/app/lib/supabase-admin';
 
 const resend = new Resend(process.env.ALLATYOU_RESEND_API_KEY!);
 

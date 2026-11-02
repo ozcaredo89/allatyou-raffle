@@ -1,10 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin as supabase } from '@/app/lib/supabase-admin';
+import { requireAdminSession } from '@/app/lib/admin-auth';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function normalizeSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-z0-9\s-]/g, '')    // remove special chars
+    .trim()
+    .replace(/\s+/g, '-')            // spaces to hyphens
+    .replace(/-+/g, '-');            // collapse multiple hyphens
+}
 
 interface CreateRaffleBody {
   name: string;
@@ -13,12 +20,17 @@ interface CreateRaffleBody {
   start_ticket?: number;
   end_ticket?: number;
   custom_numbers?: string[];
+  slug?: string;
+  is_featured?: boolean;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireAdminSession(request);
+  if (authError) return authError;
+
   try {
     const body: CreateRaffleBody = await request.json();
-    const { name, description, price_per_ticket, start_ticket, end_ticket, custom_numbers } = body;
+    const { name, description, price_per_ticket, start_ticket, end_ticket, custom_numbers, slug: rawSlug, is_featured } = body;
 
     // 1. Basic Validation
     const isSpecificMode = custom_numbers !== undefined && Array.isArray(custom_numbers);
@@ -65,6 +77,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const total_tickets = finalTickets.length;
 
+    // Normalize slug
+    const slug = rawSlug ? normalizeSlug(rawSlug) : normalizeSlug(name);
+
     // 2. Insert new Raffle
     const { data: raffle, error: raffleError } = await supabase
       .from('rafle_raffles')
@@ -76,11 +91,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         start_ticket: startToSave,
         end_ticket: endToSave,
         status: 'active',
+        slug,
+        is_featured: is_featured ?? false,
       })
       .select('id')
       .single();
 
     if (raffleError || !raffle) {
+      // Slug unique constraint violation
+      if (raffleError?.code === '23505') {
+        return NextResponse.json(
+          { error: 'slug_conflict', suggestion: `${slug}-2` },
+          { status: 409 }
+        );
+      }
       console.error('Error creating raffle:', raffleError);
       return NextResponse.json(
         { error: 'Failed to create raffle in database' },
@@ -98,22 +122,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }));
 
     // 4. Bulk insert tickets
-    // Supabase supports bulk inserts by passing an array of objects
     const { error: ticketsError } = await supabase
       .from('rafle_tickets')
       .insert(ticketsToInsert);
 
     if (ticketsError) {
       console.error('Error bulk inserting tickets:', ticketsError);
-      
-      // Optional: Since there are no SQL transactions in standard REST Supabase JS,
-      // if ticket generation fails, it's a good practice to log or attempt rollback.
       await supabase.from('rafle_raffles').delete().eq('id', raffle_id);
-
       return NextResponse.json(
         { error: 'Failed to generate tickets' },
         { status: 500 }
       );
+    }
+
+    // 5. If featured, call set_featured_raffle RPC
+    // Requires set_featured_raffle() RPC — see implementation_plan.md for SQL
+    if (is_featured === true) {
+      const { error: rpcError } = await supabase.rpc('set_featured_raffle', { p_raffle_id: raffle_id });
+      if (rpcError) {
+        console.warn('set_featured_raffle RPC error (non-fatal):', rpcError);
+      }
     }
 
     return NextResponse.json(
@@ -121,7 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 201 }
     );
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create raffle unexpected error:', error);
     return NextResponse.json(
       { error: 'Internal server error while creating raffle' },

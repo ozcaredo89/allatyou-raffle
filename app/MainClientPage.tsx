@@ -12,6 +12,12 @@ interface MainClientPageProps {
   price: number;
   startTicket?: number | null;
   endTicket?: number | null;
+  coverImageUrl?: string;          // NEW
+  otherRaffles?: {                 // NEW
+    id: string;
+    name: string;
+    slug: string | null;
+  }[];
 }
 
 export default function MainClientPage({
@@ -21,6 +27,8 @@ export default function MainClientPage({
   price,
   startTicket,
   endTicket,
+  coverImageUrl,
+  otherRaffles,
 }: MainClientPageProps) {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -93,6 +101,30 @@ export default function MainClientPage({
           <p className="max-w-md text-sm md:text-base font-medium text-zinc-400 mb-4">
             {raffleDesc}
           </p>
+        )}
+
+        {/* Cover image */}
+        {coverImageUrl && (
+          <div className="w-full max-w-sm mx-auto mb-4 rounded-xl overflow-hidden border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverImageUrl} alt={raffleName} className="w-full h-44 object-cover" />
+          </div>
+        )}
+
+        {/* Other raffles chips */}
+        {otherRaffles && otherRaffles.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-center mb-2">
+            <span className="text-xs text-zinc-500 self-center">También en juego:</span>
+            {otherRaffles.map(r => (
+              <a
+                key={r.id}
+                href={`/sorteos/${r.slug ?? r.id}`}
+                className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs font-bold text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                {r.name}
+              </a>
+            ))}
+          </div>
         )}
 
         {/* Social Links */}

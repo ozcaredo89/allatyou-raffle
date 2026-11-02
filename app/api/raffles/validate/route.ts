@@ -1,13 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { sendAdminValidationEmail } from '@/app/lib/email';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin as supabase } from '@/app/lib/supabase-admin';
+import { requireAdminSession } from '@/app/lib/admin-auth';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authError = requireAdminSession(request);
+  if (authError) return authError;
   try {
     const { ticket_id, action, admin_notes, customer_name, customer_phone } = await request.json();
 

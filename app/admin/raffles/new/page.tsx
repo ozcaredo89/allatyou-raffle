@@ -1,7 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+
+function normalizeSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 
 export default function AdminNewRafflePage() {
   const [name, setName] = useState('');
@@ -11,6 +23,20 @@ export default function AdminNewRafflePage() {
   const [endTicket, setEndTicket] = useState<number>(99);
   const [creationMode, setCreationMode] = useState<'range' | 'specific'>('range');
   const [customNumbersInput, setCustomNumbersInput] = useState<string>('');
+
+  // New fields
+  const [slug, setSlug] = useState('');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  // Auto-generate slug from name
+  useEffect(() => {
+    if (!slugManuallyEdited) {
+      setSlug(normalizeSlug(name));
+    }
+  }, [name, slugManuallyEdited]);
 
   const parseCustomNumbers = (input: string) => {
     return input.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -26,6 +52,17 @@ export default function AdminNewRafflePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setCoverFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setCoverPreview(url);
+    } else {
+      setCoverPreview(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -34,18 +71,17 @@ export default function AdminNewRafflePage() {
 
     try {
       if (!name || !price || totalTicketsCalculated <= 0) {
-        throw new Error('Debes proveer un título, precio y al menos un ticket para generar.');
+        throw new Error('Debes proveer un titulo, precio y al menos un ticket para generar.');
       }
       if (creationMode === 'range' && startTicket > endTicket) {
-        throw new Error('El rango de tickets es inválido (el inicial debe ser menor o igual al final).');
+        throw new Error('El rango de tickets es invalido (el inicial debe ser menor o igual al final).');
       }
 
-      // Validar longitud uniforme en modo específico
       const uniqueSpecifics = Array.from(new Set(currentCustomNumbers));
       if (creationMode === 'specific' && uniqueSpecifics.length > 0) {
         const firstLen = uniqueSpecifics[0].length;
         if (!uniqueSpecifics.every(n => n.length === firstLen)) {
-          throw new Error('En la modalidad de números específicos, todos los boletos deben tener exactamente la misma longitud de caracteres (ej. todos de 2 o todos de 3 dígitos).');
+          throw new Error('En la modalidad de numeros especificos, todos los boletos deben tener exactamente la misma longitud de caracteres.');
         }
       }
 
@@ -53,12 +89,15 @@ export default function AdminNewRafflePage() {
         name,
         description,
         price_per_ticket: Number(price),
+        slug: slug || normalizeSlug(name),
+        is_featured: isFeatured,
         ...(creationMode === 'range' 
           ? { start_ticket: Number(startTicket), end_ticket: Number(endTicket) }
           : { custom_numbers: uniqueSpecifics }
         ),
       };
 
+      // Step 1: Create raffle
       const res = await fetch('/api/raffles/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,10 +107,39 @@ export default function AdminNewRafflePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Ocurrió un error al crear la rifa.');
+        if (data.error === 'slug_conflict') {
+          throw new Error(`Este slug ya existe. Prueba con: ${data.suggestion}`);
+        }
+        throw new Error(data.error || 'Ocurrio un error al crear la rifa.');
       }
 
-      setSuccess(`¡Sorteo creado con éxito! Todos los números han sido generados. ID: ${data.raffle_id}`);
+      const raffle_id = data.raffle_id;
+
+      // Step 2: Upload cover image if selected
+      if (coverFile && raffle_id) {
+        const coverForm = new FormData();
+        coverForm.append('raffle_id', raffle_id);
+        coverForm.append('file', coverFile);
+
+        const coverRes = await fetch('/api/raffles/upload-cover', {
+          method: 'POST',
+          body: coverForm,
+        });
+
+        if (coverRes.ok) {
+          const coverData = await coverRes.json();
+          // Step 3: PATCH raffle with cover_image_url
+          await fetch(`/api/raffles/${raffle_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cover_image_url: coverData.cover_image_url }),
+          });
+        } else {
+          console.warn('Cover upload failed, continuing without cover image.');
+        }
+      }
+
+      setSuccess(`Sorteo creado con exito! Todos los numeros han sido generados. ID: ${raffle_id}`);
       
       // Reset form on success
       setName('');
@@ -81,9 +149,14 @@ export default function AdminNewRafflePage() {
       setEndTicket(99);
       setCustomNumbersInput('');
       setCreationMode('range');
+      setSlug('');
+      setSlugManuallyEdited(false);
+      setIsFeatured(false);
+      setCoverFile(null);
+      setCoverPreview(null);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +191,7 @@ export default function AdminNewRafflePage() {
           </div>
           <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">Nuevo Sorteo</h1>
           <p className="text-zinc-400 text-sm mt-2">
-            Configura las reglas ganadoras y genera la cuadrícula de boletos al instante.
+            Configura las reglas ganadoras y genera la cuadricula de boletos al instante.
           </p>
         </div>
 
@@ -127,19 +200,19 @@ export default function AdminNewRafflePage() {
           {/* Status Messages */}
           {error && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm font-medium text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-              <span className="mr-2">⚠️</span> {error}
+              <span className="mr-2">Warning:</span> {error}
             </div>
           )}
           {success && (
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm font-medium text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.1)]">
-              <span className="mr-2">🎉</span> {success}
+              <span className="mr-2">OK</span> {success}
             </div>
           )}
 
-          {/* Form Fields */}
+          {/* Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-bold text-zinc-300 mb-1.5">
-              Título del Sorteo *
+              Titulo del Sorteo *
             </label>
             <input
               id="name"
@@ -153,9 +226,34 @@ export default function AdminNewRafflePage() {
             />
           </div>
 
+          {/* Slug */}
+          <div>
+            <label htmlFor="slug" className="block text-sm font-bold text-zinc-300 mb-1.5">
+              URL del Sorteo (slug)
+            </label>
+            <input
+              id="slug"
+              type="text"
+              value={slug}
+              onChange={(e) => {
+                setSlug(e.target.value);
+                setSlugManuallyEdited(true);
+              }}
+              placeholder="Ej. sorteo-iphone-15"
+              disabled={isLoading}
+              className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner disabled:opacity-50 font-mono text-sm"
+            />
+            {slug && (
+              <p className="text-xs text-zinc-500 mt-1.5">
+                URL: <span className="text-blue-400 font-mono">sorteos/{slug}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Description */}
           <div>
             <label htmlFor="description" className="block text-sm font-bold text-zinc-300 mb-1.5">
-              Descripción (Opcional)
+              Descripcion (Opcional)
             </label>
             <textarea
               id="description"
@@ -167,6 +265,56 @@ export default function AdminNewRafflePage() {
               className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-zinc-600 shadow-inner resize-none disabled:opacity-50"
             />
           </div>
+
+          {/* Cover image */}
+          <div>
+            <label className="block text-sm font-bold text-zinc-300 mb-1.5">
+              Imagen de Portada (Opcional)
+            </label>
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-blue-500/50 transition-colors bg-[#0a0f16] overflow-hidden">
+              {coverPreview ? (
+                <div className="relative w-full h-full">
+                  <Image src={coverPreview} alt="Cover preview" fill className="object-cover" />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-zinc-500">
+                  <span className="text-3xl">🖼️</span>
+                  <span className="text-xs font-medium">Click para seleccionar imagen</span>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleCoverChange}
+                disabled={isLoading}
+              />
+            </label>
+            {coverFile && (
+              <p className="text-xs text-zinc-500 mt-1">
+                Archivo: <span className="text-blue-400">{coverFile.name}</span>
+              </p>
+            )}
+          </div>
+
+          {/* is_featured toggle */}
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                disabled={isLoading}
+              />
+              <div className={`w-11 h-6 rounded-full transition-colors ${isFeatured ? 'bg-amber-500' : 'bg-zinc-700'}`}>
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${isFeatured ? 'translate-x-6' : 'translate-x-1'}`} />
+              </div>
+            </div>
+            <span className="text-sm font-bold text-zinc-300">
+              Destacar como sorteo principal en el home
+            </span>
+          </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
@@ -203,7 +351,7 @@ export default function AdminNewRafflePage() {
                 }`}
               >
                 <input type="radio" className="sr-only" checked={creationMode === 'specific'} onChange={() => setCreationMode('specific')} />
-                <span className="text-xl">🎯</span> Específicos
+                <span className="text-xl">🎯</span> Especificos
               </label>
             </div>
             
@@ -246,7 +394,7 @@ export default function AdminNewRafflePage() {
             ) : (
               <div className="col-span-1 sm:col-span-2 mt-2">
                 <label htmlFor="customNumbers" className="block text-sm font-bold text-zinc-300 mb-1.5 flex items-center justify-between">
-                  Números Específicos (Separados por coma) *
+                  Numeros Especificos (Separados por coma) *
                   <span className="text-xl">🎯</span>
                 </label>
                 <textarea
@@ -259,7 +407,7 @@ export default function AdminNewRafflePage() {
                   disabled={isLoading}
                   className="w-full bg-[#0a0f16] border border-white/10 rounded-xl px-4 py-3.5 text-white text-lg font-bold transition-all focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 placeholder:text-zinc-600 shadow-inner resize-none disabled:opacity-50"
                 />
-                <p className="text-xs text-amber-500/80 mt-2 font-medium">Todos deben tener la misma longitud de dígitos. Se ignorarán los duplicados.</p>
+                <p className="text-xs text-amber-500/80 mt-2 font-medium">Todos deben tener la misma longitud de digitos. Se ignoraran los duplicados.</p>
               </div>
             )}
           </div>
@@ -293,7 +441,7 @@ export default function AdminNewRafflePage() {
                   <>
                     <div className="relative flex items-center justify-center h-5 w-5">
                       <div className="absolute inset-0 rounded-full border-t-2 border-blue-400 animate-spin" />
-                      <div className="absolute inset-1 rounded-full border-b-2 border-indigo-400 animate-spin-reverse" />
+                      <div className="absolute inset-1 rounded-full border-b-2 border-indigo-400 animate-spin" />
                     </div>
                     Fabricando Tickets...
                   </>

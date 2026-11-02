@@ -1,16 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin as supabase } from '@/app/lib/supabase-admin';
+import { requireAdminSession } from '@/app/lib/admin-auth';
 
 // PATCH: Editar una boleta específica
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; ticketId: string }> }
 ): Promise<NextResponse> {
+  const authError = requireAdminSession(request);
+  if (authError) return authError;
   try {
     const { id: raffleId, ticketId } = await params;
     const body = await request.json();
@@ -78,6 +76,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; ticketId: string }> }
 ): Promise<NextResponse> {
+  const authError = requireAdminSession(request);
+  if (authError) return authError;
   try {
     const { id: raffleId, ticketId } = await params;
 
