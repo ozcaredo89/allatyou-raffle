@@ -5,6 +5,7 @@ import Link from 'next/link';
 import NumberGrid from './components/raffle/NumberGrid';
 import CheckoutModal from './components/raffle/CheckoutModal';
 import LuckySlot from './components/raffle/LuckySlot';
+import PwaInstallButton from './components/PwaInstallButton';
 
 export interface ActiveRaffleSummary {
   id: string;
@@ -94,10 +95,10 @@ export default function MainClientPage({
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-900/20 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-900/20 blur-[120px] pointer-events-none" />
 
-      {/* Top Sticky Navigation Bar when multiple raffles are active */}
-      {hasMultipleRaffles && allRaffles && (
-        <nav className="sticky top-0 z-40 w-full border-b border-emerald-500/20 bg-[#0a0f16]/90 backdrop-blur-xl px-3 py-2.5 shadow-[0_4px_25px_rgba(0,0,0,0.6)]">
-          <div className="mx-auto max-w-5xl flex flex-wrap items-center justify-between gap-2">
+      {/* Top Sticky Navigation Bar */}
+      <nav className="sticky top-0 z-40 w-full border-b border-emerald-500/20 bg-[#0a0f16]/90 backdrop-blur-xl px-3 py-2.5 shadow-[0_4px_25px_rgba(0,0,0,0.6)]">
+        <div className="mx-auto max-w-5xl flex flex-wrap items-center justify-between gap-2">
+          {hasMultipleRaffles && allRaffles ? (
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
               <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full shrink-0">
                 🔥 {allRaffles.length} Sorteos
@@ -121,7 +122,16 @@ export default function MainClientPage({
                 );
               })}
             </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 text-xs md:text-sm font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Sorteos VIP Oficial</span>
+              </span>
+            </div>
+          )}
 
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
             <Link
               href="/sorteos"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-xs font-bold text-indigo-300 hover:bg-indigo-500/25 hover:text-white transition-all shrink-0"
@@ -129,9 +139,10 @@ export default function MainClientPage({
               <span>Ver catálogo</span>
               <span>→</span>
             </Link>
+            <PwaInstallButton variant="header" label="Instalar App" />
           </div>
-        </nav>
-      )}
+        </div>
+      </nav>
 
       {/* Header Premium Casino Style */}
       <header className="relative z-20 flex flex-col items-center justify-center border-b border-white/5 bg-[#0a0f16]/80 px-4 py-8 text-center backdrop-blur-xl supports-[backdrop-filter]:bg-[#0a0f16]/60">

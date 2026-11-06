@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Image from 'next/image';
 import TicketDownloadButton from '@/app/components/raffle/TicketDownloadButton';
+import PwaInstallButton from '@/app/components/PwaInstallButton';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -290,7 +291,8 @@ export default function AdminRafflesPage() {
             <p className="text-zinc-400 text-sm mt-1">Administra tus rifas, pausalas o edita su informacion publica.</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <PwaInstallButton variant="admin" label="📲 Descargar App Admin" />
             <button
               onClick={async () => {
                 await fetch('/api/admin/logout', { method: 'POST' });

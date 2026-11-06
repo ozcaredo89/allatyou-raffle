@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PwaInstallButton from '@/app/components/PwaInstallButton';
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
@@ -79,6 +80,14 @@ export default function AdminLoginPage() {
           >
             {loading ? 'Verificando...' : 'Entrar al panel'}
           </button>
+
+          <div className="pt-2 border-t border-white/5 flex flex-col items-center">
+            <PwaInstallButton
+              variant="admin"
+              label="📲 Instalar App en este celular"
+              className="w-full justify-center text-xs py-3"
+            />
+          </div>
         </form>
       </div>
     </div>
