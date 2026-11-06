@@ -8,6 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"console.log('No unit tests configured')\"",
+    "test:e2e": "node -e \"console.log('No e2e tests configured')\"",
     "check-secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
