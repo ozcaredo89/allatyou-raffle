@@ -35,15 +35,50 @@ export default function ValidationPanelPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'reserved' | 'paid'>('pending');
+  const [raffleInfo, setRaffleInfo] = useState<{ id: string; name: string; slug: string | null } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const [notesState, setNotesState] = useState<Record<string, string>>({});
   const [editingCustomer, setEditingCustomer] = useState<{ticket_id: string; name: string; phone: string} | null>(null);
   const [previewTicket, setPreviewTicket] = useState<ValidationTicket | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
 
+  const handleCopyLink = async () => {
+    if (!raffleInfo) return;
+    const path = `/sorteos/${raffleInfo.slug || raffleInfo.id}`;
+    const fullUrl = `${window.location.origin}${path}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(fullUrl);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = fullUrl;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      alert('No se pudo copiar el enlace.');
+    }
+  };
+
   const fetchTickets = async () => {
     setLoading(true);
     setError(null);
+
+    // Fetch raffle basic info
+    const { data: raffleData } = await supabase
+      .from('rafle_raffles')
+      .select('id, name, slug')
+      .eq('id', raffle_id)
+      .maybeSingle();
+
+    if (raffleData) {
+      setRaffleInfo(raffleData);
+    }
 
     const { data: ticketsData, error: ticketsError } = await supabase
       .from('rafle_tickets')
@@ -75,7 +110,7 @@ export default function ValidationPanelPage({
     // Fetch customer data manually for the tickets
     const customerIds = Array.from(new Set(ticketsData.map(t => t.customer_id).filter(Boolean)));
     
-    let customersMap: Record<string, any> = {};
+    let customersMap: Record<string, { id: string; name: string; phone: string }> = {};
     if (customerIds.length > 0) {
       const { data: customers } = await supabase
         .from('rafle_customers')
@@ -105,6 +140,7 @@ export default function ValidationPanelPage({
 
   useEffect(() => {
     fetchTickets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raffle_id]);
 
   useEffect(() => {
@@ -144,8 +180,8 @@ export default function ValidationPanelPage({
 
       // Refresh list
       fetchTickets();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error al procesar la acción.');
     }
   };
 
@@ -169,8 +205,8 @@ export default function ValidationPanelPage({
 
       setEditingCustomer(null);
       fetchTickets();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error al actualizar cliente.');
     }
   };
 
@@ -192,20 +228,47 @@ export default function ValidationPanelPage({
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
           <div>
-            <Link href="/admin/raffles" className="text-emerald-500 hover:text-emerald-400 text-sm font-bold flex items-center gap-2 mb-2">
-              ← Volver al Listado
-            </Link>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <Link href="/admin/raffles" className="text-emerald-500 hover:text-emerald-400 text-sm font-bold flex items-center gap-2">
+                ← Volver al Listado
+              </Link>
+              {raffleInfo && (
+                <>
+                  <span className="text-zinc-600">•</span>
+                  <button
+                    onClick={handleCopyLink}
+                    className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      copiedLink
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                    }`}
+                    title="Copiar enlace público de la rifa"
+                  >
+                    <span>{copiedLink ? '✓' : '🔗'}</span>
+                    <span>{copiedLink ? '¡Enlace copiado!' : 'Copiar link público'}</span>
+                  </button>
+                  <Link
+                    href={`/sorteos/${raffleInfo.slug || raffleInfo.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white border border-white/10 transition-colors"
+                  >
+                    <span>↗ Ver público</span>
+                  </Link>
+                </>
+              )}
+            </div>
             <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
-              Panel de Validación
+              Panel de Validación {raffleInfo ? `• ${raffleInfo.name}` : ''}
             </h1>
             <p className="text-zinc-400 text-sm mt-1">Revisa comprobantes y aprueba pagos.</p>
           </div>
           
           <div className="flex bg-[#0f151f] border border-white/10 rounded-xl overflow-hidden p-1">
-             {['pending', 'reserved', 'paid', 'all'].map(status => (
+             {(['pending', 'reserved', 'paid', 'all'] as const).map(status => (
                <button 
                  key={status}
-                 onClick={() => setFilter(status as any)}
+                 onClick={() => setFilter(status)}
                  className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${filter === status ? 'bg-emerald-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                >
                  {status === 'pending' ? 'Por Validar' : status === 'reserved' ? 'Reservados' : status === 'paid' ? 'Pagados' : 'Todos'}

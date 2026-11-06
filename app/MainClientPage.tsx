@@ -6,6 +6,7 @@ import NumberGrid from './components/raffle/NumberGrid';
 import CheckoutModal from './components/raffle/CheckoutModal';
 import LuckySlot from './components/raffle/LuckySlot';
 import PwaInstallButton from './components/PwaInstallButton';
+import ShareRaffleModal from './components/raffle/ShareRaffleModal';
 
 export interface ActiveRaffleSummary {
   id: string;
@@ -25,6 +26,7 @@ interface MainClientPageProps {
   endTicket?: number | null;
   coverImageUrl?: string;
   allRaffles?: ActiveRaffleSummary[];
+  raffleSlug?: string | null;
 }
 
 export default function MainClientPage({
@@ -36,11 +38,15 @@ export default function MainClientPage({
   endTicket,
   coverImageUrl,
   allRaffles,
+  raffleSlug,
 }: MainClientPageProps) {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [availableTickets, setAvailableTickets] = useState<string[]>([]);
   const [ticketDigits, setTicketDigits] = useState<number>(0);
+
+  const activeSlug = raffleSlug ?? allRaffles?.find(r => r.id === raffleId)?.slug ?? null;
 
   // Ocultar el botón global de WhatsApp cuando hay tickets seleccionados
   useEffect(() => {
@@ -132,6 +138,14 @@ export default function MainClientPage({
           )}
 
           <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <button
+              onClick={() => setIsShareOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 hover:text-white transition-all shrink-0 cursor-pointer"
+              title="Compartir sorteo"
+            >
+              <span>📢</span>
+              <span className="hidden xs:inline">Compartir</span>
+            </button>
             <Link
               href="/sorteos"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-xs font-bold text-indigo-300 hover:bg-indigo-500/25 hover:text-white transition-all shrink-0"
@@ -172,6 +186,14 @@ export default function MainClientPage({
 
         {/* Social Links */}
         <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+          <button
+            onClick={() => setIsShareOpen(true)}
+            className="flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 text-sm font-bold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:bg-emerald-500 hover:text-white transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] cursor-pointer"
+            aria-label="Compartir sorteo"
+          >
+            <span>📢</span>
+            <span>Compartir</span>
+          </button>
           <a href="https://www.instagram.com/jersonfranco_?igsh=a3RsamZqcHVtMG9y&utm_source=qr" target="_blank" rel="noopener noreferrer" 
              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/30 px-4 py-2 text-sm font-bold text-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.15)] hover:from-pink-500 hover:to-purple-600 hover:text-white transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)]" aria-label="Instagram">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -316,6 +338,15 @@ export default function MainClientPage({
         raffleName={raffleName}
         totalPrice={selectedTickets.length * price}
         onSuccess={onSuccess}
+      />
+
+      {/* Share Raffle Modal */}
+      <ShareRaffleModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        raffleName={raffleName}
+        raffleSlug={activeSlug}
+        raffleId={raffleId}
       />
     </div>
   );
