@@ -15,14 +15,14 @@ export default async function SorteoPage({ params }: { params: Promise<{ slug: s
   // Try by slug first, then fall back to id (UUID compatibility)
   let { data: raffle } = await supabase
     .from('rafle_raffles')
-    .select('id, name, description, price_per_ticket, start_ticket, end_ticket, status, cover_image_url')
+    .select('id, name, description, price_per_ticket, start_ticket, end_ticket, status, cover_image_url, slug')
     .eq('slug', slug)
     .maybeSingle();
 
   if (!raffle) {
     const { data: byId } = await supabase
       .from('rafle_raffles')
-      .select('id, name, description, price_per_ticket, start_ticket, end_ticket, status, cover_image_url')
+      .select('id, name, description, price_per_ticket, start_ticket, end_ticket, status, cover_image_url, slug')
       .eq('id', slug)
       .maybeSingle();
     raffle = byId;
@@ -35,7 +35,7 @@ export default async function SorteoPage({ params }: { params: Promise<{ slug: s
       <div className="flex min-h-screen items-center justify-center p-8 bg-[#0a0f16]">
         <div className="text-center rounded-xl bg-[#0f151f] p-8 shadow-sm border border-white/10">
           <h1 className="text-2xl font-bold mb-2 text-white">Este sorteo no esta disponible</h1>
-          <p className="text-zinc-400">El sorteo "{raffle.name}" no se encuentra activo en este momento.</p>
+          <p className="text-zinc-400">El sorteo &quot;{raffle.name}&quot; no se encuentra activo en este momento.</p>
         </div>
       </div>
     );
@@ -67,6 +67,7 @@ export default async function SorteoPage({ params }: { params: Promise<{ slug: s
       endTicket={raffle.end_ticket}
       coverImageUrl={raffle.cover_image_url ?? undefined}
       allRaffles={allRaffles}
+      raffleSlug={raffle.slug || slug}
     />
   );
 }
