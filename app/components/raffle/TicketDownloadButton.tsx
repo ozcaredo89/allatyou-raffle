@@ -28,8 +28,15 @@ const DATE_POS_X = 306;
 const DATE_POS_Y = 2550; // Ajusta para que quede sobre las líneas ___/___/___
 
 // RECUADRO DERECHO (Ticket y QR)
-const TICKET_POS_X = 1280;
-const TICKET_POS_Y = 2150; // Ajusta para que quede sobre la línea corta
+// Placa del número de ticket: se dibuja SOBRE el recuadro "TICKET N°" de la
+// plantilla (x≈970-1465, y≈2085-2185) para poder mostrar el número mucho más grande.
+const PLATE_X = 968;
+const PLATE_Y = 2028;
+const PLATE_W = 502;
+const PLATE_H = 164;
+const PLATE_LABEL_Y = 2076; // línea base de "TICKET N°"
+const PLATE_NUMBER_Y = 2172; // línea base del número
+const TICKET_MAX_FONT = 118; // tamaño máximo del número (px); se reduce si no cabe
 const QR_POS_X = 1003;
 const QR_POS_Y = 2220; // Ajusta para ubicar el QR en el recuadro blanco
 const QR_SIZE = 410; // Tamaño del QR (ancho y alto)
@@ -37,9 +44,68 @@ const QR_SIZE = 410; // Tamaño del QR (ancho y alto)
 // ESTILOS DE TEXTO
 const NAME_FONT = 'bold 80px Arial, sans-serif';
 const DATE_FONT = 'bold 45px Arial, sans-serif';
-const TICKET_FONT = 'bold 70px "Courier New", Courier, monospace';
+const TICKET_FONT_FAMILY = '"Courier New", Courier, monospace';
 const TEXT_COLOR = '#0f151f';
 // -------------------------------------------------------------
+
+function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Placa crema con borde dorado que cubre el recuadro original y muestra el
+// número de ticket en grande (se achica solo si tiene muchos dígitos).
+function drawTicketPlate(ctx: CanvasRenderingContext2D, ticketNumber: string) {
+  const fill = ctx.createLinearGradient(0, PLATE_Y, 0, PLATE_Y + PLATE_H);
+  fill.addColorStop(0, '#fdf3bd');
+  fill.addColorStop(1, '#f4e49c');
+  const border = ctx.createLinearGradient(PLATE_X, PLATE_Y, PLATE_X + PLATE_W, PLATE_Y + PLATE_H);
+  border.addColorStop(0, '#f6dc8a');
+  border.addColorStop(0.5, '#b98a2a');
+  border.addColorStop(1, '#f3d27a');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 6;
+  roundedRectPath(ctx, PLATE_X, PLATE_Y, PLATE_W, PLATE_H, 30);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.restore();
+  roundedRectPath(ctx, PLATE_X, PLATE_Y, PLATE_W, PLATE_H, 30);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = border;
+  ctx.stroke();
+
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.textAlign = 'center';
+  const centerX = PLATE_X + PLATE_W / 2;
+
+  ctx.font = 'bold 40px Arial, sans-serif';
+  ctx.fillText('TICKET N°', centerX, PLATE_LABEL_Y);
+
+  let size = TICKET_MAX_FONT;
+  ctx.font = `bold ${size}px ${TICKET_FONT_FAMILY}`;
+  const maxWidth = PLATE_W - 60;
+  while (size > 40 && ctx.measureText(ticketNumber).width > maxWidth) {
+    size -= 4;
+    ctx.font = `bold ${size}px ${TICKET_FONT_FAMILY}`;
+  }
+  ctx.fillText(ticketNumber, centerX, PLATE_NUMBER_Y);
+  ctx.textAlign = 'left';
+}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -145,9 +211,8 @@ export default function TicketDownloadButton({
       ctx.font = DATE_FONT;
       ctx.fillText(purchaseDate, DATE_POS_X, DATE_POS_Y);
 
-      // Número del Ticket
-      ctx.font = TICKET_FONT;
-      ctx.fillText(ticketNumber, TICKET_POS_X, TICKET_POS_Y);
+      // Número del Ticket (placa grande sobre el recuadro de la plantilla)
+      drawTicketPlate(ctx, ticketNumber);
 
       // 4. Generar el QR
       const verifyUrl = `${window.location.origin}/verify?ticket=${encodeURIComponent(ticketNumber)}&raffle=${encodeURIComponent(raffleId)}`;
