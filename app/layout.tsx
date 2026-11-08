@@ -21,8 +21,30 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Sorteos Premium VIP",
+  metadataBase: new URL("https://raffle.allatyou.com"),
+  title: "Jerson Franco",
   description: "Compra tus números y participa por premios increíbles.",
+  // Vista previa al compartir el enlace (WhatsApp, Facebook, etc.)
+  openGraph: {
+    title: "Jerson Franco",
+    siteName: "Jerson Franco",
+    description: "Compra tus números y participa por premios increíbles.",
+    type: "website",
+    locale: "es_CO",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Hermosa Suzuki DR-160X 0 KM + $4.000.000 - Jerson Franco",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Jerson Franco",
+    images: ["/og-image.jpg"],
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

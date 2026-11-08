@@ -28,8 +28,15 @@ const DATE_POS_X = 306;
 const DATE_POS_Y = 2550; // Ajusta para que quede sobre las líneas ___/___/___
 
 // RECUADRO DERECHO (Ticket y QR)
-const TICKET_POS_X = 1280;
-const TICKET_POS_Y = 2150; // Ajusta para que quede sobre la línea corta
+// Placa del número de ticket: se dibuja SOBRE el recuadro "TICKET N°" de la
+// plantilla (x≈970-1465, y≈2085-2185) para poder mostrar el número mucho más grande.
+const PLATE_X = 968;
+const PLATE_Y = 2028;
+const PLATE_W = 502;
+const PLATE_H = 164;
+const PLATE_LABEL_Y = 2076; // línea base de "TICKET N°"
+const PLATE_NUMBER_Y = 2172; // línea base del número
+const TICKET_MAX_FONT = 118; // tamaño máximo del número (px); se reduce si no cabe
 const QR_POS_X = 1003;
 const QR_POS_Y = 2220; // Ajusta para ubicar el QR en el recuadro blanco
 const QR_SIZE = 410; // Tamaño del QR (ancho y alto)
@@ -37,9 +44,68 @@ const QR_SIZE = 410; // Tamaño del QR (ancho y alto)
 // ESTILOS DE TEXTO
 const NAME_FONT = 'bold 80px Arial, sans-serif';
 const DATE_FONT = 'bold 45px Arial, sans-serif';
-const TICKET_FONT = 'bold 70px "Courier New", Courier, monospace';
+const TICKET_FONT_FAMILY = '"Courier New", Courier, monospace';
 const TEXT_COLOR = '#0f151f';
 // -------------------------------------------------------------
+
+function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Placa crema con borde dorado que cubre el recuadro original y muestra el
+// número de ticket en grande (se achica solo si tiene muchos dígitos).
+function drawTicketPlate(ctx: CanvasRenderingContext2D, ticketNumber: string) {
+  const fill = ctx.createLinearGradient(0, PLATE_Y, 0, PLATE_Y + PLATE_H);
+  fill.addColorStop(0, '#fdf3bd');
+  fill.addColorStop(1, '#f4e49c');
+  const border = ctx.createLinearGradient(PLATE_X, PLATE_Y, PLATE_X + PLATE_W, PLATE_Y + PLATE_H);
+  border.addColorStop(0, '#f6dc8a');
+  border.addColorStop(0.5, '#b98a2a');
+  border.addColorStop(1, '#f3d27a');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 6;
+  roundedRectPath(ctx, PLATE_X, PLATE_Y, PLATE_W, PLATE_H, 30);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.restore();
+  roundedRectPath(ctx, PLATE_X, PLATE_Y, PLATE_W, PLATE_H, 30);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = border;
+  ctx.stroke();
+
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.textAlign = 'center';
+  const centerX = PLATE_X + PLATE_W / 2;
+
+  ctx.font = 'bold 40px Arial, sans-serif';
+  ctx.fillText('TICKET N°', centerX, PLATE_LABEL_Y);
+
+  let size = TICKET_MAX_FONT;
+  ctx.font = `bold ${size}px ${TICKET_FONT_FAMILY}`;
+  const maxWidth = PLATE_W - 60;
+  while (size > 40 && ctx.measureText(ticketNumber).width > maxWidth) {
+    size -= 4;
+    ctx.font = `bold ${size}px ${TICKET_FONT_FAMILY}`;
+  }
+  ctx.fillText(ticketNumber, centerX, PLATE_NUMBER_Y);
+  ctx.textAlign = 'left';
+}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -66,6 +132,19 @@ export default function TicketDownloadButton({
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [isSaveHelpOpen, setIsSaveHelpOpen] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  // Blob del PNG ya generado: se prepara de antemano para poder llamar a
+  // navigator.share() dentro del gesto del usuario (iOS lo exige).
+  const blobRef = useRef<Blob | null>(null);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsIos(
+      /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  }, []);
 
   const isPaid = status === 'paid';
   const inlinePreview = showPreview ?? variant === 'default';
@@ -132,9 +211,8 @@ export default function TicketDownloadButton({
       ctx.font = DATE_FONT;
       ctx.fillText(purchaseDate, DATE_POS_X, DATE_POS_Y);
 
-      // Número del Ticket
-      ctx.font = TICKET_FONT;
-      ctx.fillText(ticketNumber, TICKET_POS_X, TICKET_POS_Y);
+      // Número del Ticket (placa grande sobre el recuadro de la plantilla)
+      drawTicketPlate(ctx, ticketNumber);
 
       // 4. Generar el QR
       const verifyUrl = `${window.location.origin}/verify?ticket=${encodeURIComponent(ticketNumber)}&raffle=${encodeURIComponent(raffleId)}`;
@@ -153,6 +231,9 @@ export default function TicketDownloadButton({
       ctx.drawImage(qrCanvas, QR_POS_X, QR_POS_Y, QR_SIZE, QR_SIZE);
 
       const dataUrl = canvas.toDataURL('image/png');
+      blobRef.current = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png')
+      );
       setPreviewDataUrl(dataUrl);
       return dataUrl;
     } catch (err) {
@@ -183,13 +264,82 @@ export default function TicketDownloadButton({
       return;
     }
 
+    const fileName = `Boleta_Sorteo_${ticketNumber}.png`;
+    const blob = blobRef.current;
+
+    // iPhone/iPad: <a download> con data: URL no guarda la imagen (abre la misma
+    // pestaña o la manda a Archivos). Se usa el menú nativo "Guardar imagen".
+    if (isIos) {
+      if (blob) {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: `Boleta #${ticketNumber}` });
+            return;
+          } catch (err) {
+            // El usuario cerró el menú: no hay nada más que hacer
+            if ((err as DOMException)?.name === 'AbortError') return;
+          }
+        }
+      }
+      // Sin soporte (p. ej. navegador interno de WhatsApp/Instagram): guía manual
+      setIsSaveHelpOpen(true);
+      return;
+    }
+
+    // Resto de plataformas: descarga normal (blob URL, más fiable que data: URL)
+    const objectUrl = blob ? URL.createObjectURL(blob) : dataUrl;
     const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `Boleta_Sorteo_${ticketNumber}.png`;
+    link.href = objectUrl;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    if (blob) setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
   };
+
+  const saveHelpModal =
+    isSaveHelpOpen && previewDataUrl ? (
+      <div
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md text-left"
+        onClick={() => setIsSaveHelpOpen(false)}
+      >
+        <div
+          className="relative max-h-[94vh] w-full max-w-sm flex flex-col items-center gap-3 rounded-2xl bg-[#0f151f] border border-white/15 p-4 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex w-full items-center justify-between border-b border-white/10 pb-2.5">
+            <span className="text-sm font-black text-white">Guarda tu boleta #{ticketNumber}</span>
+            <button
+              type="button"
+              onClick={() => setIsSaveHelpOpen(false)}
+              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-xs text-zinc-300 text-center">
+            Mantén presionada la imagen y elige{' '}
+            <strong className="text-emerald-400">Guardar en Fotos</strong> (o «Agregar a Fotos»).
+          </p>
+          <div className="overflow-y-auto max-h-[64vh] w-full flex justify-center rounded-xl bg-black/50 p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewDataUrl}
+              alt={`Boleta #${ticketNumber}`}
+              className="w-auto max-w-full object-contain rounded-lg"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsSaveHelpOpen(false)}
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white hover:bg-white/10"
+          >
+            Listo
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   if (!isPaid) {
     return (
@@ -262,7 +412,14 @@ export default function TicketDownloadButton({
               {isGenerating ? 'Generando...' : `Descargar Boleta #${ticketNumber}`}
             </span>
           </button>
+          {isIos && (
+            <p className="mt-2 text-center text-[11px] text-zinc-400">
+              📱 En iPhone se abrirá un menú: elige <strong className="text-zinc-200">Guardar imagen</strong> para enviarla a Fotos.
+            </p>
+          )}
         </div>
+
+        {saveHelpModal}
 
         {/* Lightbox para ver en grande */}
         {isZoomOpen && previewDataUrl && (
@@ -314,6 +471,7 @@ export default function TicketDownloadButton({
   return (
     <>
       <canvas ref={canvasRef} className="hidden" />
+      {saveHelpModal}
 
       <button
         type="button"
