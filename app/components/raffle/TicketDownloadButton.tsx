@@ -66,6 +66,19 @@ export default function TicketDownloadButton({
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+  const [isSaveHelpOpen, setIsSaveHelpOpen] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  // Blob del PNG ya generado: se prepara de antemano para poder llamar a
+  // navigator.share() dentro del gesto del usuario (iOS lo exige).
+  const blobRef = useRef<Blob | null>(null);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsIos(
+      /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  }, []);
 
   const isPaid = status === 'paid';
   const inlinePreview = showPreview ?? variant === 'default';
@@ -153,6 +166,9 @@ export default function TicketDownloadButton({
       ctx.drawImage(qrCanvas, QR_POS_X, QR_POS_Y, QR_SIZE, QR_SIZE);
 
       const dataUrl = canvas.toDataURL('image/png');
+      blobRef.current = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png')
+      );
       setPreviewDataUrl(dataUrl);
       return dataUrl;
     } catch (err) {
@@ -183,13 +199,82 @@ export default function TicketDownloadButton({
       return;
     }
 
+    const fileName = `Boleta_Sorteo_${ticketNumber}.png`;
+    const blob = blobRef.current;
+
+    // iPhone/iPad: <a download> con data: URL no guarda la imagen (abre la misma
+    // pestaña o la manda a Archivos). Se usa el menú nativo "Guardar imagen".
+    if (isIos) {
+      if (blob) {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: `Boleta #${ticketNumber}` });
+            return;
+          } catch (err) {
+            // El usuario cerró el menú: no hay nada más que hacer
+            if ((err as DOMException)?.name === 'AbortError') return;
+          }
+        }
+      }
+      // Sin soporte (p. ej. navegador interno de WhatsApp/Instagram): guía manual
+      setIsSaveHelpOpen(true);
+      return;
+    }
+
+    // Resto de plataformas: descarga normal (blob URL, más fiable que data: URL)
+    const objectUrl = blob ? URL.createObjectURL(blob) : dataUrl;
     const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `Boleta_Sorteo_${ticketNumber}.png`;
+    link.href = objectUrl;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    if (blob) setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
   };
+
+  const saveHelpModal =
+    isSaveHelpOpen && previewDataUrl ? (
+      <div
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md text-left"
+        onClick={() => setIsSaveHelpOpen(false)}
+      >
+        <div
+          className="relative max-h-[94vh] w-full max-w-sm flex flex-col items-center gap-3 rounded-2xl bg-[#0f151f] border border-white/15 p-4 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex w-full items-center justify-between border-b border-white/10 pb-2.5">
+            <span className="text-sm font-black text-white">Guarda tu boleta #{ticketNumber}</span>
+            <button
+              type="button"
+              onClick={() => setIsSaveHelpOpen(false)}
+              className="rounded-full p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-xs text-zinc-300 text-center">
+            Mantén presionada la imagen y elige{' '}
+            <strong className="text-emerald-400">Guardar en Fotos</strong> (o «Agregar a Fotos»).
+          </p>
+          <div className="overflow-y-auto max-h-[64vh] w-full flex justify-center rounded-xl bg-black/50 p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewDataUrl}
+              alt={`Boleta #${ticketNumber}`}
+              className="w-auto max-w-full object-contain rounded-lg"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsSaveHelpOpen(false)}
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white hover:bg-white/10"
+          >
+            Listo
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   if (!isPaid) {
     return (
@@ -262,7 +347,14 @@ export default function TicketDownloadButton({
               {isGenerating ? 'Generando...' : `Descargar Boleta #${ticketNumber}`}
             </span>
           </button>
+          {isIos && (
+            <p className="mt-2 text-center text-[11px] text-zinc-400">
+              📱 En iPhone se abrirá un menú: elige <strong className="text-zinc-200">Guardar imagen</strong> para enviarla a Fotos.
+            </p>
+          )}
         </div>
+
+        {saveHelpModal}
 
         {/* Lightbox para ver en grande */}
         {isZoomOpen && previewDataUrl && (
@@ -314,6 +406,7 @@ export default function TicketDownloadButton({
   return (
     <>
       <canvas ref={canvasRef} className="hidden" />
+      {saveHelpModal}
 
       <button
         type="button"
