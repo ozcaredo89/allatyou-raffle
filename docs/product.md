@@ -11,6 +11,7 @@
    - Includes sharing tools (Native Web Share, WhatsApp direct message, and copy-link button) to maximize audience reach.
 3. **Ticket Verification (`/verify`):**
    - Allows participants to check ticket status and retrieve issued ticket digital passes.
+   - Ticket download: on iPhone/iPad it opens the native share sheet ("Guardar imagen" to Photos), falling back to a long-press-to-save modal in in-app browsers; Android and desktop download the PNG directly.
 4. **Admin Management (`/admin/raffles`):**
    - List and filter raffles, toggle active/paused/featured states.
    - Direct shortcuts to copy public raffle links, open raffle view, edit tickets, and audit payments.
