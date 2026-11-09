@@ -25,6 +25,7 @@ interface NumberGridProps {
   selectedTickets: string[];
   onTicketSelect?: (ticketNumber: string) => void;
   onDataLoaded?: (availableTickets: string[], ticketDigits: number) => void;
+  refreshTrigger?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +65,7 @@ export default function NumberGrid({
   selectedTickets,
   onTicketSelect,
   onDataLoaded,
+  refreshTrigger,
 }: NumberGridProps) {
   const [statusMap, setStatusMap] = useState<TicketStatusMap>({});
   const [allTicketNumbers, setAllTicketNumbers] = useState<string[]>([]);
@@ -143,7 +145,7 @@ export default function NumberGrid({
     }, 30_000);
 
     return () => clearInterval(intervalId);
-  }, [fetchTickets]);
+  }, [fetchTickets, refreshTrigger]);
 
   // Real-time subscription via Supabase Realtime
   useEffect(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import TicketDownloadButton from '@/app/components/raffle/TicketDownloadButton';
 
 interface CheckoutModalProps {
@@ -11,6 +11,13 @@ interface CheckoutModalProps {
   raffleName?: string;
   totalPrice: number;
   onSuccess: () => void;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
 }
 
 export default function CheckoutModal({
@@ -29,9 +36,39 @@ export default function CheckoutModal({
   const [error, setError] = useState<string | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      setIsPreviewExpanded(false);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
+
+  useEffect(() => {
+    if (!isPreviewExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPreviewExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewExpanded]);
 
   const handleCopy = (num: string) => {
     navigator.clipboard.writeText(num);
@@ -69,15 +106,50 @@ export default function CheckoutModal({
     }
   };
 
+  const selectImageFile = (selected: File) => {
+    if (!selected.type.startsWith('image/')) {
+      setError('Por favor selecciona un archivo de imagen válido.');
+      return;
+    }
+    setFile(selected);
+    setError(null);
+    setTimeout(() => {
+      confirmButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selected = e.target.files[0];
-      if (!selected.type.startsWith('image/')) {
-        setError('Por favor selecciona un archivo de imagen válido.');
-        return;
-      }
-      setFile(selected);
-      setError(null);
+      selectImageFile(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      selectImageFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleClearFile = () => {
+    setFile(null);
+    setIsPreviewExpanded(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -116,7 +188,7 @@ export default function CheckoutModal({
     setStep(1);
     setName('');
     setPhone('');
-    setFile(null);
+    handleClearFile();
     setError(null);
     onClose();
   };
@@ -127,14 +199,14 @@ export default function CheckoutModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md">
       <div className="w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden rounded-2xl bg-[#0f151f] shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-white/10 relative">
 
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-emerald-500/10 blur-[50px] pointer-events-none" />
 
         {/* Header Modal */}
-        <div className="relative border-b border-white/5 bg-[#141b26] px-6 py-5 shrink-0">
+        <div className="relative border-b border-white/5 bg-[#141b26] px-5 sm:px-6 py-4 sm:py-5 shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
               <span className="text-emerald-400">#</span>
@@ -153,10 +225,22 @@ export default function CheckoutModal({
         </div>
 
         {/* Cuerpos del Modal */}
-        <div className="p-6 relative overflow-y-auto">
+        <div className="p-5 sm:p-6 relative overflow-y-auto">
           {error && (
             <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm font-medium text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-              {error}
+              <p>{error}</p>
+              {error.includes('ya no están disponibles') && (
+                <a
+                  href="#sorteo"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSuccessClose();
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 font-bold text-emerald-400 underline underline-offset-4 transition-colors hover:text-emerald-300 cursor-pointer"
+                >
+                  ← Volver al sorteo
+                </a>
+              )}
             </div>
           )}
 
@@ -299,7 +383,7 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-              <div className="mt-2">
+              <div className="mt-1">
                 <input
                   type="file"
                   accept="image/*"
@@ -312,35 +396,108 @@ export default function CheckoutModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-600 bg-zinc-800/30 py-10 transition-all hover:border-emerald-500 hover:bg-emerald-500/5 group"
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`flex w-full flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed py-8 px-4 transition-all group cursor-pointer ${
+                      isDragging
+                        ? 'border-emerald-400 bg-emerald-500/15 scale-[1.01]'
+                        : 'border-zinc-600 bg-zinc-800/30 hover:border-emerald-500 hover:bg-emerald-500/5 active:scale-[0.99]'
+                    }`}
                   >
                     <span className="text-4xl shadow-black drop-shadow-lg group-hover:scale-110 transition-transform">📸</span>
-                    <span className="text-sm font-bold text-zinc-300 group-hover:text-emerald-400">
-                      Tocar para Subir Foto
+                    <span className="text-sm font-bold text-zinc-200 group-hover:text-emerald-400">
+                      Toca para subir tu comprobante
+                    </span>
+                    <span className="text-xs text-zinc-500 hidden sm:inline">
+                      o arrastra y suelta la imagen aquí (PNG, JPG, WEBP)
+                    </span>
+                    <span className="text-[11px] text-zinc-500 sm:hidden">
+                      Captura de pantalla o foto clara del pago
                     </span>
                   </button>
                 ) : (
-                  <div className="flex items-center justify-between rounded-xl border border-white/20 bg-white/5 p-4 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">📄</span>
-                      <span className="text-sm font-medium text-zinc-300 truncate">{file.name}</span>
+                  <div className="overflow-hidden rounded-xl border border-emerald-500/30 bg-[#0a0f16] shadow-[0_0_25px_rgba(16,185,129,0.12)] text-left">
+                    {/* Barra superior de estado del archivo */}
+                    <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-[#141b26] px-3.5 py-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] font-bold text-emerald-400">
+                          ✓
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate" title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className="text-[10px] text-zinc-400">
+                            {formatFileSize(file.size)} • Listo para enviar
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearFile}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs text-zinc-400 transition-colors hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-300 active:scale-95"
+                        title="Quitar imagen"
+                        aria-label="Quitar imagen"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFile(null);
-                      }}
-                      className="ml-2 rounded-full border border-white/20 bg-black/60 p-2 text-white backdrop-blur-md transition-colors hover:bg-red-500 flex-shrink-0"
-                    >
-                      ✕
-                    </button>
+
+                    {/* Contenedor de la vista previa de la imagen */}
+                    {previewUrl && (
+                      <div
+                        onClick={() => setIsPreviewExpanded(true)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setIsPreviewExpanded(true);
+                          }
+                        }}
+                        className="group relative flex items-center justify-center bg-[#070b10] p-3 cursor-zoom-in select-none"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={previewUrl}
+                          alt="Vista previa del comprobante de pago"
+                          className="max-h-52 sm:max-h-60 w-auto max-w-full rounded-lg object-contain shadow-md transition-transform duration-200 group-hover:scale-[1.02]"
+                        />
+                        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/75 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 backdrop-blur-md transition-colors group-hover:border-emerald-400/40 group-hover:text-white">
+                          <span>🔍</span>
+                          <span>Ampliar</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Acciones rápidas inferiores (óptimo para móvil y laptop) */}
+                    <div className="grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 bg-[#111722]">
+                      <button
+                        type="button"
+                        onClick={() => setIsPreviewExpanded(true)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-zinc-300 transition-colors hover:bg-white/5 hover:text-white active:bg-white/10"
+                      >
+                        <span>🔍</span>
+                        <span>Ver completo</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-emerald-400 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 active:bg-emerald-500/15"
+                      >
+                        <span>🔄</span>
+                        <span>Cambiar foto</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="mt-2 relative group">
+              <div className="mt-1 relative group">
                 <div className={`absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 opacity-40 group-hover:opacity-60 blur transition duration-300 ${!file && 'hidden'}`}></div>
                 <button
+                  ref={confirmButtonRef}
                   type="button"
                   onClick={handleUploadProof}
                   disabled={loading || !file}
@@ -390,6 +547,69 @@ export default function CheckoutModal({
 
         </div>
       </div>
+
+      {/* Lightbox para inspeccionar el comprobante a pantalla completa */}
+      {isPreviewExpanded && previewUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 p-3 sm:p-6 backdrop-blur-md"
+          onClick={() => setIsPreviewExpanded(false)}
+        >
+          <div
+            className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0f151f] shadow-2xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 bg-[#141b26] px-4 py-3 shrink-0">
+              <div className="min-w-0 pr-3">
+                <p className="text-xs font-bold text-white truncate">
+                  Vista previa del comprobante
+                </p>
+                {file && (
+                  <p className="text-[11px] text-zinc-400 truncate">
+                    {file.name} ({formatFileSize(file.size)})
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewExpanded(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sm text-zinc-300 hover:bg-white/10 hover:text-white"
+                aria-label="Cerrar vista ampliada"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-[#070b10] p-3 sm:p-4 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl}
+                alt="Comprobante ampliado"
+                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#141b26] px-4 py-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewExpanded(false);
+                  fileInputRef.current?.click();
+                }}
+                className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 transition-colors hover:bg-emerald-500/20"
+              >
+                🔄 Cambiar imagen
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPreviewExpanded(false)}
+                className="rounded-xl bg-white/10 px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-white/20"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -45,6 +45,7 @@ export default function MainClientPage({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [availableTickets, setAvailableTickets] = useState<string[]>([]);
   const [ticketDigits, setTicketDigits] = useState<number>(0);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   const activeSlug = raffleSlug ?? allRaffles?.find(r => r.id === raffleId)?.slug ?? null;
 
@@ -80,6 +81,7 @@ export default function MainClientPage({
 
   const onSuccess = () => {
     setSelectedTickets([]);
+    setRefreshKey(prev => prev + 1);
     setIsCheckoutOpen(false);
   };
 
@@ -307,6 +309,7 @@ export default function MainClientPage({
             selectedTickets={selectedTickets}
             onTicketSelect={handleTicketSelect}
             onDataLoaded={handleDataLoaded}
+            refreshTrigger={refreshKey}
           />
         </div>
       </main>
