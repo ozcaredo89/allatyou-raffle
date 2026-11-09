@@ -1,6 +1,6 @@
 # Spec: 0004-purchase-view-phase1
 
-- **Issue:** Closes #5
+- **Issue:** Closes #5, #7
 - **Status:** Completed
 - **Created:** 2026-11-09
 
@@ -30,6 +30,7 @@ Make the public purchase view (`/` and `/sorteos/[slug]`) sell the raffle instea
 - [x] The grid has a number search (partial match, with a clear "no existe / no disponible" message), "termina en" 0–9 chips, an "Solo disponibles" toggle and a "ir a página" control; filters reset the page to 1.
 - [x] The Lucky Slot lets the buyer choose 1, 2, 3 or 5 numbers, shows a confetti burst when the reels stop, and respects `prefers-reduced-motion` (no spin/confetti).
 - [x] Reserving from the slot adds all drawn numbers (respecting the 30-ticket cap) and opens the checkout.
+- [x] Tapping a winner photo opens it enlarged in a lightbox (portal to `body`, previous/next buttons, ← → and Esc keys, backdrop click closes, page scroll locked, focus returns to the photo). (Issue #7)
 - [x] `NumberGrid` no longer re-fetches in a loop (parent callback is stable).
 - [x] Mobile (375px) has no horizontal scroll and the primary button is visible without scrolling past the hero text.
 

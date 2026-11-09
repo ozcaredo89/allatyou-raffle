@@ -6,7 +6,7 @@
    - Allows users to choose and enter any active raffle.
 2. **Individual Raffle Page (`/sorteos/[slug]`):**
    - Opens with a hero (name, description, large cover image, ticket price) and an "Elegir mi número" button, followed by a 3-step "Elige → Paga → Recibe" guide and a progress bar built from real ticket statuses ("X de N números ya tienen dueño").
-   - Shows a "Ganadores reales" strip with photos of previous winners (`public/winners/`, captions in `WinnersStrip.tsx`).
+   - Shows a "Ganadores reales" strip with photos of previous winners (`public/winners/`, captions in `WinnersStrip.tsx`); tapping a photo opens it enlarged with previous/next navigation.
    - Number grid with search, "termina en" chips, "Solo disponibles" toggle and page jump.
    - Allows users to select tickets manually or generate 1, 2, 3 or 5 random tickets via Lucky Slot (confetti on result; no spin/confetti with reduced-motion).
    - Instagram/Facebook links and other active raffles live below the grid.
