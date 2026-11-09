@@ -1,7 +1,7 @@
 # Spec: 0004-purchase-view-phase1
 
 - **Issue:** Closes #5
-- **Status:** Completed (pending commit)
+- **Status:** Completed
 - **Created:** 2026-11-09
 
 ## 1. Objective
@@ -49,4 +49,4 @@ Make the public purchase view (`/` and `/sorteos/[slug]`) sell the raffle instea
 - [x] `npm run test:e2e`
 - [x] Acceptance criteria checked in this spec
 - [x] `docs/product.md` updated if behavior changed
-- [ ] Changes committed, pushed to remote, merged to `main`, and linked GitHub issue/ticket closed
+- [x] Changes committed, pushed to remote, merged to `main`, and linked GitHub issue/ticket closed
