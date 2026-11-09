@@ -66,3 +66,11 @@ Documento de referencia rápida para retomar contexto sin explorar todo el códi
 - `POST /api/raffles/reserve` → Crea cliente y ejecuta RPC `reserve_tickets`.
 - `POST /api/raffles/upload-proof` → Sube comprobante a R2, marca ticket y notifica por correo al admin.
 - `POST /api/raffles/validate` → Acciones admin: `approve`, `reject` (limpieza profunda), `edit_customer`.
+
+---
+
+## 5. Flujo de Trabajo y Entrega (Definition of Done)
+Para cada cambio o requerimiento:
+1. Crear/actualizar el spec correspondiente en `docs/specs/NNNN-slug.md` (usando [`docs/specs/TEMPLATE.md`](docs/specs/TEMPLATE.md)) y actualizar [`docs/product.md`](docs/product.md) si cambia el comportamiento del producto.
+2. Verificar compilación y calidad (`npm run typecheck`, `npm run lint`, `npm run build`).
+3. Hacer `git commit`, `git push`, merge a `main` (o PR merge) y cerrar el issue/ticket correspondiente en GitHub (`Closes #N`).

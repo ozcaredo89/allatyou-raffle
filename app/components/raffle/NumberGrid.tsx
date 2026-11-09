@@ -1,7 +1,8 @@
 'use client';
 
 import { createClient } from '@supabase/supabase-js';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import type { TicketStats } from './RaffleProgress';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,7 +25,7 @@ interface NumberGridProps {
   end_ticket?: number | null;
   selectedTickets: string[];
   onTicketSelect?: (ticketNumber: string) => void;
-  onDataLoaded?: (availableTickets: string[], ticketDigits: number) => void;
+  onDataLoaded?: (availableTickets: string[], ticketDigits: number, stats: TicketStats) => void;
   refreshTrigger?: number;
 }
 
@@ -41,7 +42,13 @@ const supabase = createClient(
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Removed helper since we rely on fetched numbers decorators
+function buildStats(numbers: string[], map: TicketStatusMap): { available: string[]; stats: TicketStats } {
+  const available = numbers.filter((n) => (map[n] || 'available') === 'available');
+  return {
+    available,
+    stats: { total: numbers.length, available: available.length, taken: numbers.length - available.length },
+  };
+}
 
 function statusToStyle(status: TicketStatus | undefined): string {
   switch (status) {
@@ -75,8 +82,30 @@ export default function NumberGrid({
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 100;
-  const total_tickets = allTicketNumbers.length || Number.MAX_SAFE_INTEGER; // Will settle after fetch
-  const totalPages = Math.ceil(allTicketNumbers.length / itemsPerPage);
+
+  // Search / filter state
+  const [query, setQuery] = useState('');
+  const [endsWith, setEndsWith] = useState<string | null>(null);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+
+  const filteredNumbers = useMemo(() => {
+    const q = query.trim();
+    return allTicketNumbers.filter((n) => {
+      if (q && !n.includes(q)) return false;
+      if (endsWith !== null && !n.endsWith(endsWith)) return false;
+      if (onlyAvailable && (statusMap[n] || 'available') !== 'available') return false;
+      return true;
+    });
+  }, [allTicketNumbers, statusMap, query, endsWith, onlyAvailable]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredNumbers.length / itemsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const hasFilters = query.trim() !== '' || endsWith !== null || onlyAvailable;
+  const digitsLen = allTicketNumbers[0]?.length ?? 0;
+  const exactMatch =
+    query.trim().length > 0
+      ? allTicketNumbers.find((n) => n === query.trim().padStart(digitsLen, '0'))
+      : undefined;
 
   const fetchTickets = useCallback(async () => {
     // Paginate to handle large ticket counts (Supabase default limit = 1000)
@@ -130,9 +159,8 @@ export default function NumberGrid({
 
     // Provide available tickets to parent (e.g. for LuckySlot)
     if (onDataLoaded && numbers.length > 0) {
-      const available = numbers.filter(n => (map[n] || 'available') === 'available');
-      const digits = numbers[0].length;
-      onDataLoaded(available, digits);
+      const { available, stats } = buildStats(numbers, map);
+      onDataLoaded(available, numbers[0].length, stats);
     }
   }, [raffle_id, onDataLoaded]);
 
@@ -170,9 +198,8 @@ export default function NumberGrid({
               
               // Recalculate and emit available tickets on realtime update
               if (onDataLoaded && allTicketNumbers.length > 0) {
-                 const available = allTicketNumbers.filter(n => (newMap[n] || 'available') === 'available');
-                 const digits = allTicketNumbers[0].length;
-                 onDataLoaded(available, digits);
+                 const { available, stats } = buildStats(allTicketNumbers, newMap);
+                 onDataLoaded(available, allTicketNumbers[0].length, stats);
               }
               
               return newMap;
@@ -224,6 +251,101 @@ export default function NumberGrid({
 
   return (
     <div className="w-full">
+      {/* Search & filters */}
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" aria-hidden>🔍</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value.replace(/\D/g, ''));
+                setCurrentPage(1);
+              }}
+              placeholder="Busca tu número de la suerte"
+              aria-label="Buscar número"
+              className="w-full rounded-xl border border-white/10 bg-[#0a0f16] py-3 pl-11 pr-4 text-base font-bold text-white placeholder:font-medium placeholder:text-zinc-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+            />
+          </div>
+          <label className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#0a0f16] px-4 py-3 text-sm font-bold text-zinc-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={onlyAvailable}
+              onChange={(e) => {
+                setOnlyAvailable(e.target.checked);
+                setCurrentPage(1);
+              }}
+              className="h-4 w-4 accent-emerald-500"
+            />
+            Solo disponibles
+          </label>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">Termina en</span>
+          {['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={endsWith === d}
+              onClick={() => {
+                setEndsWith((cur) => (cur === d ? null : d));
+                setCurrentPage(1);
+              }}
+              className={`h-9 w-9 shrink-0 rounded-lg border text-sm font-black transition-colors cursor-pointer ${
+                endsWith === d
+                  ? 'border-emerald-400 bg-emerald-500/25 text-white'
+                  : 'border-white/10 bg-[#0a0f16] text-zinc-400 hover:border-emerald-400/50 hover:text-emerald-300'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setEndsWith(null);
+                setOnlyAvailable(false);
+                setCurrentPage(1);
+              }}
+              className="shrink-0 ml-1 text-xs font-bold text-amber-400 underline underline-offset-2 cursor-pointer"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        {query.trim() !== '' && (
+          <p className="text-sm font-bold" role="status">
+            {exactMatch ? (
+              (statusMap[exactMatch] || 'available') === 'available' ? (
+                <span className="text-emerald-300">
+                  ¡El {exactMatch} está disponible!{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleTicketClick(exactMatch, 'available')}
+                    className="ml-1 rounded-lg bg-emerald-500 px-3 py-1 text-xs font-black text-slate-950 cursor-pointer"
+                  >
+                    {selectedTickets.includes(exactMatch) ? 'Quitar' : 'Elegir'}
+                  </button>
+                </span>
+              ) : (
+                <span className="text-amber-400">El {exactMatch} ya no está disponible.</span>
+              )
+            ) : filteredNumbers.length === 0 ? (
+              <span className="text-zinc-400">No hay números que coincidan con «{query}».</span>
+            ) : (
+              <span className="text-zinc-400">{filteredNumbers.length} resultado(s)</span>
+            )}
+          </p>
+        )}
+      </div>
+
       {/* Legend */}
       <div className="mb-8 flex flex-wrap items-center justify-center gap-6 text-xs font-bold uppercase tracking-wider">
         <span className="flex items-center gap-2 text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]">
@@ -247,8 +369,8 @@ export default function NumberGrid({
           gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
         }}
       >
-        {allTicketNumbers
-          .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+        {filteredNumbers
+          .slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage)
           .map((ticketNumber) => {
             const status = statusMap[ticketNumber] || 'available';
             const isDisabled = status !== 'available';
@@ -281,20 +403,33 @@ export default function NumberGrid({
       {totalPages > 1 && (
         <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-6">
           <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
+            disabled={safePage === 1}
             className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d131c] px-5 py-3 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>←</span> Anterior
           </button>
           
-          <span className="text-sm font-bold text-zinc-500">
-            Página <strong className="text-white">{currentPage}</strong> de {totalPages}
-          </span>
+          <label className="flex items-center gap-2 text-sm font-bold text-zinc-500">
+            Página
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={safePage}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!Number.isNaN(v)) setCurrentPage(Math.min(totalPages, Math.max(1, v)));
+              }}
+              aria-label="Ir a la página"
+              className="w-16 rounded-lg border border-white/10 bg-[#0a0f16] px-2 py-1 text-center font-black text-white focus:border-emerald-400 focus:outline-none"
+            />
+            de {totalPages}
+          </label>
           
           <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+            disabled={safePage === totalPages}
             className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d131c] px-5 py-3 text-sm font-bold text-zinc-300 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Siguiente <span>→</span>
