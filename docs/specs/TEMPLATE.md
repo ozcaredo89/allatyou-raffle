@@ -28,3 +28,4 @@ A brief summary of what this feature or fix accomplishes and its user impact.
 - [ ] `npm run test:e2e`
 - [ ] Acceptance criteria checked in this spec
 - [ ] `docs/product.md` updated if behavior changed
+- [ ] Changes committed, pushed to remote, merged to `main`, and linked GitHub issue/ticket closed
